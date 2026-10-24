@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+  background: #f6f4ec;
+  color: #14281a;
+}
+
+/* themed scrollbar: gold thumb on dark track */
+/* Firefox only — Chrome/Edge/Safari use the ::-webkit-scrollbar rules below */
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #c99a4b #14281a;
+  }
+}
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: #14281a;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #e8bd6d, #a87a32);
+  border-radius: 999px;
+  border: 2px solid #14281a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #f1cc85, #c99a4b);
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes popDiamond {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) rotate(45deg) scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) rotate(45deg) scale(1);
+  }
+}
+
+::selection {
+  background: #c99a4b;
+  color: #14281a;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  .container-site {
+    @apply mx-auto w-full max-w-site px-4 sm:px-8 lg:px-12;
+  }
+
+  /* gold button with light-sweep on hover */
+  .btn-gold {
+    @apply relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gradient-to-b from-gold-light to-gold px-9 py-4 text-base font-semibold text-ink shadow-[0_8px_30px_-8px_rgba(201,154,75,0.7)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_40px_-8px_rgba(232,189,109,0.9)];
+  }
+  .btn-gold::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -80%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.8s ease;
+  }
+  .btn-gold:hover::after {
+    left: 140%;
+  }
+
+  /* dark forest-green pill button (primary action in the Al Qirat theme) */
+  .btn-forest {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-forest px-7 py-3.5 text-sm font-medium text-white shadow-[0_10px_26px_-12px_rgba(20,40,26,0.8)] transition duration-300 hover:-translate-y-0.5 hover:bg-ink;
+  }
+
+  /* animated gold gradient text */
+  .text-shimmer {
+    background: linear-gradient(100deg, #c99a4b 10%, #fff1c9 35%, #e8bd6d 50%, #c99a4b 70%, #fff1c9 90%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    @apply animate-shimmer;
+  }
+
+  /* same shimmer, darker golds so it stays visible on cream backgrounds */
+  .text-shimmer-dark {
+    background: linear-gradient(100deg, #a87a32 10%, #d9a846 35%, #8f6424 50%, #c99a4b 70%, #e3b766 90%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    @apply animate-shimmer;
+  }
+
+  /* underline that grows from the left */
+  .link-underline {
+    @apply relative;
+  }
+  .link-underline::after {
+    content: "";
+    @apply absolute -bottom-1.5 left-0 h-[2px] w-0 bg-gold transition-all duration-300;
+  }
+  .link-underline:hover::after {
+    @apply w-full;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.next-*/
+.env
+.env.local
+.env.*.local
+!.env.example
+
+
+# Raw brand photos (large originals). Web-sized copies live in public/.
+al-qirat-images/
