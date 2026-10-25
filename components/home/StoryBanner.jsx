@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import Reveal from "../Reveal";
 import SmartImage from "../SmartImage";
 import { brand } from "@/lib/brand";
@@ -28,7 +27,7 @@ export default function StoryBanner() {
             scent is carefully selected to leave a lasting impression.
           </p>
           <a href="/about" className="btn-forest mt-7 !px-6 !py-3">
-            Our Story <ArrowRight size={15} />
+            Our Story
           </a>
         </Reveal>
       </div>

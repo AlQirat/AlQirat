@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import Reveal from "../Reveal";
 import SmartImage from "../SmartImage";
 import Ornament from "./Ornament";
@@ -41,7 +40,7 @@ export default function CategoryArches({ categories }) {
                   <h3 className="font-serif text-2xl font-semibold text-ink">{card.name}</h3>
                   {card.blurb && <p className="mx-auto mt-1.5 max-w-[190px] pb-4 text-[12.5px] leading-snug text-ink/60">{card.blurb}</p>}
                   <span className="btn-forest mt-auto !px-5 !py-2.5 !text-[13px] group-hover:bg-ink">
-                    Shop Now <ArrowRight size={14} />
+                    Shop Now
                   </span>
                 </div>
               </a>

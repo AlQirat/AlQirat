@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Loader2 } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -53,7 +53,7 @@ export default function CartPage() {
               <h2 className="mt-4 font-serif text-2xl font-semibold text-ink">Your cart is empty</h2>
               <p className="mt-2 text-stone-500">Looks like you haven't added any products yet.</p>
               <Link href="/shop" className="btn-gold mt-6 inline-flex">
-                <ArrowLeft size={16} className="mr-2" /> Continue Shopping
+                Continue Shopping
               </Link>
             </div>
           ) : (

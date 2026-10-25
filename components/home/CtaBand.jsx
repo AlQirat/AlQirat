@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import Reveal from "../Reveal";
 import SmartImage from "../SmartImage";
 
@@ -25,7 +24,7 @@ export default function CtaBand() {
             Explore our exclusive collection of perfumes and attars, crafted to make your presence memorable.
           </p>
           <a href="/shop" className="btn-gold mt-7 !px-7 !py-3 !text-sm">
-            Shop Now <ArrowRight size={15} />
+            Shop Now
           </a>
         </Reveal>
       </div>

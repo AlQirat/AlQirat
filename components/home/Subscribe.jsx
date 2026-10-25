@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Check, Mail } from "lucide-react";
+import { Check, Mail } from "lucide-react";
 import Reveal from "../Reveal";
 import Ornament from "./Ornament";
 
@@ -65,7 +65,7 @@ export default function Subscribe() {
             {/* honeypot: hidden from people, filled in by bots */}
             <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
             <button type="submit" disabled={submitting} className="btn-forest !h-12 !px-7 disabled:opacity-60">
-              {submitting ? "Subscribing..." : <>Subscribe <ArrowRight size={16} /></>}
+              {submitting ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, ChevronDown, ChevronRight, Heart, ShoppingBag, User } from "lucide-react";
+import { ChevronDown, Heart, ShoppingBag, User } from "lucide-react";
 import Logo from "./Logo";
 import MobileSidebar from "./MobileSidebar";
 import ProductSearch from "./ProductSearch";
@@ -68,13 +68,12 @@ function ShopMenu({ item, active }) {
                     imgClassName="h-full w-full object-cover"
                   />
                   <span className="flex-1 text-[15px] font-medium text-ink">{category.name}</span>
-                  <ChevronRight size={18} className="text-ink/30 transition group-hover/row:translate-x-0.5 group-hover/row:text-gold-dark" />
                 </a>
               </li>
             ))}
           </ul>
-          <a href={item.href} className="flex items-center justify-center gap-2 border-t border-stone-100 bg-cream/60 py-3 text-[13px] font-medium text-ink transition hover:text-gold-dark">
-            View all products <ArrowRight size={14} />
+          <a href={item.href} className="flex items-center justify-center border-t border-stone-100 bg-cream/60 py-3 text-[13px] font-medium text-ink transition hover:text-gold-dark">
+            View all products
           </a>
         </div>
       </div>
@@ -205,7 +204,7 @@ export default function Header({ initialCatalog, initialContent }) {
               </Link>
 
               <a href="/shop" className="btn-forest ml-3 hidden !px-6 !py-3 sm:inline-flex">
-                Shop Now <ArrowRight size={16} />
+                Shop Now
               </a>
 
               <button

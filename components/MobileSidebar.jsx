@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Heart, X, ShoppingBag } from "lucide-react";
+import { ChevronDown, Heart, X, ShoppingBag } from "lucide-react";
 import Logo from "./Logo";
 import SmartImage from "./SmartImage";
 import { useCart } from "./CartProvider";
@@ -155,7 +155,6 @@ export default function MobileSidebar({ open, onClose, items }) {
                                   />
                                 )}
                                 <span className="flex-1">{c.name}</span>
-                                <ChevronRight size={18} className="text-ink/30" />
                               </a>
                             </li>
                           ))}

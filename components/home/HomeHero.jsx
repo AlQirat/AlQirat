@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
 import SmartImage from "../SmartImage";
 import { useStorefrontContent } from "../useStorefrontData";
 import { brand } from "@/lib/brand";
@@ -82,7 +81,7 @@ export default function HomeHero({ initialContent }) {
           </p>
 
           <a href={slide.cta_href || "/shop"} className="btn-forest mt-8 animate-fade-up !px-7 [animation-delay:350ms]">
-            {slide.cta_label || "Shop Now"} <ArrowRight size={16} />
+            {slide.cta_label || "Shop Now"}
           </a>
 
         </div>

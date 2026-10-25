@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Check, Heart, ShoppingCart, Star, StarHalf } from "lucide-react";
+import { Check, Heart, ShoppingCart, Star, StarHalf } from "lucide-react";
 import Reveal from "../Reveal";
 import SmartImage from "../SmartImage";
 import Ornament from "./Ornament";
@@ -50,9 +50,9 @@ export default function FeaturedProducts({ initialCatalog }) {
           <p className="mt-3 text-sm text-ink/60">Our most loved fragrances, chosen by our customers.</p>
           <a
             href="/shop"
-            className="mt-5 inline-flex items-center gap-2 rounded-full border border-gold px-5 py-2 text-xs font-medium text-ink transition hover:bg-gold hover:text-ink md:absolute md:right-0 md:top-3 md:mt-0"
+            className="mt-5 inline-flex items-center justify-center rounded-full border border-gold px-5 py-2 text-xs font-medium text-ink transition hover:bg-gold hover:text-ink md:absolute md:right-0 md:top-3 md:mt-0"
           >
-            View All <ArrowRight size={14} />
+            View All
           </a>
         </Reveal>
 

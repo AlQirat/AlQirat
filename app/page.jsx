@@ -9,6 +9,7 @@ import FeatureStrip from "@/components/home/FeatureStrip";
 import CtaBand from "@/components/home/CtaBand";
 import InstagramFeed from "@/components/home/InstagramFeed";
 import Subscribe from "@/components/home/Subscribe";
+import SignatureScent from "@/components/home/SignatureScent";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function Home() {
       <main>
         <HomeHero initialContent={content} />
         <CategoryArches categories={catalog.categories} />
+        <SignatureScent />
         <FeaturedProducts initialCatalog={catalog} />
         <StoryBanner />
         <FeatureStrip />

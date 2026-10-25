@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, Heart, ShoppingCart, Star, StarHalf, Tag, Filter, ChevronDown } from "lucide-react";
+import { Eye, Heart, ShoppingCart, Star, StarHalf, Tag, Filter, ChevronDown } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
 import Particles from "./Particles";
@@ -488,9 +488,9 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
 
         {filteredProducts.length > 0 && (
           <nav aria-label="Product pagination" className="mt-9 flex flex-wrap items-center justify-center gap-2">
-            <button type="button" disabled={activePage === 1} onClick={() => { setCurrentPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="flex h-10 items-center gap-1 rounded-full border border-gold/30 bg-white px-4 text-sm font-semibold transition hover:border-gold disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} /> Previous</button>
+            <button type="button" disabled={activePage === 1} onClick={() => { setCurrentPage((page) => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="flex h-10 items-center justify-center rounded-full border border-gold/30 bg-white px-4 text-sm font-semibold transition hover:border-gold disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
             {visiblePages.map((page) => <button key={page} type="button" aria-current={page === activePage ? "page" : undefined} onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`h-10 min-w-10 rounded-full border px-3 text-sm font-bold transition ${page === activePage ? "border-gold bg-gold text-ink" : "border-stone-200 bg-white hover:border-gold"}`}>{page}</button>)}
-            <button type="button" disabled={activePage === pageCount} onClick={() => { setCurrentPage((page) => Math.min(pageCount, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="flex h-10 items-center gap-1 rounded-full border border-gold/30 bg-white px-4 text-sm font-semibold transition hover:border-gold disabled:cursor-not-allowed disabled:opacity-40">Next <ChevronRight size={16} /></button>
+            <button type="button" disabled={activePage === pageCount} onClick={() => { setCurrentPage((page) => Math.min(pageCount, page + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="flex h-10 items-center justify-center rounded-full border border-gold/30 bg-white px-4 text-sm font-semibold transition hover:border-gold disabled:cursor-not-allowed disabled:opacity-40">Next</button>
           </nav>
         )}
 

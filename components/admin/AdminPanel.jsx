@@ -30,6 +30,7 @@ import AdminOrders from "@/components/admin/AdminOrders";
 import AdminProducts from "@/components/admin/AdminProducts";
 import AdminInquiries from "@/components/admin/AdminInquiries";
 import AdminSubscribers from "@/components/admin/AdminSubscribers";
+import AdminCustomPerfume from "@/components/admin/AdminCustomPerfume";
 import { AdminContentManager, AdminDeliverySettings, AdminReviews } from "@/components/admin/AdminContent";
 
 const navigation = [
@@ -41,6 +42,7 @@ const navigation = [
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "inquiries", label: "Inquiries", icon: MessageSquare },
   { id: "subscribers", label: "Subscribers", icon: Mail },
+  { id: "custom-perfume", label: "Custom Perfume Requests", icon: Star },
   { id: "hero-slides", label: "Hero Slides", icon: ImageIcon },
   { id: "announcements", label: "Announcements", icon: BellRing },
   { id: "delivery", label: "Delivery Settings", icon: Truck },
@@ -187,6 +189,7 @@ function renderModule(active) {
   if (active === "reviews") return <AdminReviews />;
   if (active === "inquiries") return <AdminInquiries />;
   if (active === "subscribers") return <AdminSubscribers />;
+  if (active === "custom-perfume") return <AdminCustomPerfume />;
   if (active === "hero-slides") return <AdminContentManager resource="hero-slides" />;
   if (active === "announcements") return <AdminContentManager resource="announcements" />;
   if (active === "delivery") return <AdminDeliverySettings />;

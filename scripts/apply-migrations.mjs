@@ -18,6 +18,8 @@ const defaultMigrations = [
   "013_product_media_reviews_and_cod.sql",
   "017_al_qirat_storefront_defaults.sql",
   "018_newsletter_subscribers.sql",
+  "20261025_custom_perfume_requests.sql",
+  "20261025_custom_perfume_order_checkout.sql",
 ];
 
 function loadEnv() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, LogIn, Mail, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -19,8 +19,13 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState({ type: initialError ? "error" : "", message: initialError || "" });
   const [submitting, setSubmitting] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const isRegistering = mode === "register";
   const isResettingPassword = mode === "reset";
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -105,7 +110,7 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
         </>
       )}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} data-auth-ready={hydrated ? "true" : "false"} className="space-y-4">
             {isRegistering && (
               <label className="block">
                 <span className="sr-only">Full name</span>
