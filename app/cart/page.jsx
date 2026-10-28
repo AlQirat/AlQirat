@@ -15,6 +15,7 @@ export default function CartPage() {
   const [updating, setUpdating] = useState(null);
 
   const deliverySettings = storefrontContent?.delivery_settings;
+  const codEnabled = deliverySettings?.cod_enabled !== false;
   const freeShippingThreshold = Number(deliverySettings?.free_shipping_threshold ?? 999);
   const standardShippingAmount = Number(deliverySettings?.standard_shipping_amount ?? 90);
   const shipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : standardShippingAmount;
@@ -164,7 +165,7 @@ export default function CartPage() {
                   Proceed to Checkout
                 </Link>
                 <p className="mt-4 text-center text-xs text-stone-500">
-                  Secure checkout · COD available · No login required to view cart
+                  Secure checkout · {codEnabled ? "COD available" : "Online payment only"} · No login required to view cart
                 </p>
               </section>
             </div>

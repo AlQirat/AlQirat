@@ -20,6 +20,8 @@ const defaultMigrations = [
   "018_newsletter_subscribers.sql",
   "20261025_custom_perfume_requests.sql",
   "20261025_custom_perfume_order_checkout.sql",
+  "20261028_razorpay_checkout.sql",
+  "20261028_cod_availability.sql",
 ];
 
 function loadEnv() {

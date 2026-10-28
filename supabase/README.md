@@ -20,13 +20,21 @@ Migrations: `001` admin authorisation, `002` catalog, `003` commerce, `004` stor
 `006` customer checkout, `011` storefront defaults and checkout integrity, `012` product variants,
 `013` galleries / reviews / COD, `017` Al Qirat defaults, `018` newsletter subscribers, `20261025_custom_perfume_requests`,
 and `20261025_custom_perfume_order_checkout`.
+The `20261028_razorpay_checkout` migration adds server-created Razorpay orders, payment verification
+fields, and the RPCs used by the signed Razorpay webhook. Set `RAZORPAY_KEY_ID`,
+`RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` only in the server environment. Configure the
+webhook URL as `https://<your-domain>/api/webhooks/razorpay` and subscribe to `payment.captured` and
+`payment.failed` in the matching Razorpay Test or Live mode.
+The `20261028_cod_availability` migration adds the admin-controlled `cod_enabled` delivery setting;
+disabling it hides COD at checkout and also blocks new COD orders at the database boundary.
 
 ## Supabase Auth settings (set in the Supabase dashboard)
 
-Customer sign-up, email confirmation and password reset need your site URL:
+Customer email OTP authentication uses Supabase Auth for session creation and Brevo for delivery. Set your site URL:
 
 - Authentication > URL Configuration > **Site URL**: your production URL (e.g. the Vercel domain).
-- **Redirect URLs**: `https://<your-domain>/auth/confirm` and `http://localhost:3000/auth/confirm`.
+
+The application reads `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME` from `.env` (lowercase equivalents are also accepted). No database migration is required for OTP authentication; the existing customer trigger creates the customer profile when a new OTP user is created.
 
 ## Admin dashboard
 

@@ -23,9 +23,10 @@ export async function PUT(request) {
   if (!/^[A-Z]{3}$/.test(currency) || !message) return NextResponse.json({ error: "Currency and delivery message are required." }, { status: 400 });
 
   const supabase = createAdminCatalogClient();
-  const { data: existing, error: readError } = await supabase.from("delivery_settings").select("id").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  const { data: existing, error: readError } = await supabase.from("delivery_settings").select("id,cod_enabled").order("updated_at", { ascending: false }).limit(1).maybeSingle();
   if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
-  const payload = { free_shipping_threshold: threshold, standard_shipping_amount: shipping, currency_code: currency, delivery_message: message };
+  const codEnabled = body.cod_enabled === undefined ? existing?.cod_enabled ?? true : body.cod_enabled === true || body.cod_enabled === "true";
+  const payload = { free_shipping_threshold: threshold, standard_shipping_amount: shipping, currency_code: currency, delivery_message: message, cod_enabled: codEnabled };
   const query = existing ? supabase.from("delivery_settings").update(payload).eq("id", existing.id) : supabase.from("delivery_settings").insert(payload);
   const { data, error } = await query.select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
