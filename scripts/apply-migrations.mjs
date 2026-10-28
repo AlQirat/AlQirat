@@ -21,6 +21,7 @@ const defaultMigrations = [
   "20261025_custom_perfume_requests.sql",
   "20261025_custom_perfume_order_checkout.sql",
   "20261028_razorpay_checkout.sql",
+  "20261028_shiprocket_fulfillment.sql",
   "20261028_cod_availability.sql",
   "20261028_auth_rate_limiting.sql",
   "20261028_auth_rate_limiting_function_fix.sql",

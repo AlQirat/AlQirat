@@ -25,6 +25,9 @@ fields, and the RPCs used by the signed Razorpay webhook. Set `RAZORPAY_KEY_ID`,
 `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` only in the server environment. Configure the
 webhook URL as `https://<your-domain>/api/webhooks/razorpay` and subscribe to `payment.captured` and
 `payment.failed` in the matching Razorpay Test or Live mode.
+The `20261028_shiprocket_fulfillment` migration adds Shiprocket order, shipment, AWB and tracking
+fields. Configure the Shiprocket tracking webhook as `https://<your-domain>/api/webhooks/logistics`
+with the `x-api-key` token stored in `SHIPROCKET_WEBHOOK_TOKEN`.
 The `20261028_cod_availability` migration adds the admin-controlled `cod_enabled` delivery setting;
 disabling it hides COD at checkout and also blocks new COD orders at the database boundary.
 
