@@ -20,6 +20,9 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
     const email = `scent-test-${randomUUID()}@example.com`;
     const created = check(await service.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: "Scent Test Customer" } }));
     users.push(created.user.id);
+    const generated = check(await service.auth.admin.generateLink({ type: "magiclink", email }));
+    const otp = generated.properties.email_otp;
+    const verificationType = generated.properties.verification_type || "magiclink";
     const context = await browser.newContext({ baseURL });
     contexts.push(context);
     const page = await context.newPage();
@@ -27,9 +30,18 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
     await page.goto("/login?next=/custom-perfume");
     await page.waitForLoadState("networkidle");
     await expect(page.locator('form[data-auth-ready="true"]')).toBeVisible({ timeout: 20000 });
+    await page.route("**/api/auth/request-otp", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, verificationType, otpLength: String(otp).length }),
+      });
+    });
     await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill(password);
-    await page.getByRole("button", { name: "Log In", exact: true }).click();
+    await page.getByRole("button", { name: "Send verification code", exact: true }).click();
+    await expect(page.getByText(`We sent a verification code to ${email}.`)).toBeVisible();
+    await page.locator('input[name="otp"]').fill(otp);
+    await page.getByRole("button", { name: "Verify & Continue", exact: true }).click();
     await expect(page).toHaveURL(/\/custom-perfume$/);
     await expect(page.getByRole("button", { name: "Submit My Request" })).toBeVisible({ timeout: 20000 });
     return { page, context };

@@ -15,6 +15,8 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
   const [otpEmail, setOtpEmail] = useState("");
   const [otpType, setOtpType] = useState("magiclink");
   const [otpLength, setOtpLength] = useState(6);
+  const [passwordResetMode, setPasswordResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const isRegistering = mode === "register";
 
   useEffect(() => {
@@ -98,13 +100,39 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
     }
   }
 
+  async function handlePasswordReset(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setStatus({ type: "", message: "" });
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("resetEmail") || "").trim().toLowerCase();
+    setResetEmail(email);
+
+    try {
+      const response = await fetch("/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "We could not send a password reset link.");
+      setStatus({ type: "success", message: result.message || "If an account exists for that email, a password reset link is on its way." });
+    } catch (error) {
+      setStatus({ type: "error", message: error instanceof Error ? error.message : "We could not send a password reset link." });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <AuthFrame
-      eyebrow={isRegistering ? "Join Al Qirat Perfumes" : "Welcome Back"}
-      title={isRegistering ? "Create your account" : "Log in to Al Qirat"}
-      description={isRegistering ? "Create an account to save your delivery details and enjoy a faster checkout." : "Enter your email and we will send a secure one-time verification code."}
+      eyebrow={passwordResetMode ? "Password Recovery" : isRegistering ? "Join Al Qirat Perfumes" : "Welcome Back"}
+      title={passwordResetMode ? "Reset your password" : isRegistering ? "Create your account" : "Log in to Al Qirat"}
+      description={passwordResetMode ? "Enter your email and we will send a secure link to choose a new password." : isRegistering ? "Create an account to save your delivery details and enjoy a faster checkout." : "Enter your email and we will send a secure one-time verification code."}
       footer={(
-        <>
+        passwordResetMode ? (
+          <button type="button" onClick={() => { setPasswordResetMode(false); setStatus({ type: "", message: "" }); }} className="font-bold text-gold-dark transition hover:text-ink">Return to sign in</button>
+        ) : <>
           {isRegistering ? "Already have an account? " : "New to Al Qirat? "}
           <a href={`${isRegistering ? "/login" : "/register"}?next=${encodeURIComponent(nextPath)}`} className="font-bold text-gold-dark transition hover:text-ink">
             {isRegistering ? "Sign in" : "Create an account"}
@@ -112,7 +140,22 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
         </>
       )}
     >
-      {otpSent ? (
+      {passwordResetMode ? (
+        <form onSubmit={handlePasswordReset} className="space-y-4">
+          <label className="block">
+            <span className="sr-only">Email address</span>
+            <span className="flex h-14 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 shadow-sm transition focus-within:border-gold focus-within:ring-4 focus-within:ring-gold/10">
+              <Mail size={18} className="text-gold-dark" />
+              <input name="resetEmail" type="email" value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} required autoComplete="email" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-stone-400" placeholder="Email address" />
+            </span>
+          </label>
+          {status.message && <p role={status.type === "error" ? "alert" : "status"} className={`rounded-xl px-4 py-3 text-sm ${status.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{status.message}</p>}
+          <button disabled={submitting} className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-forest px-6 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_16px_30px_-18px_rgba(20,40,26,0.9)] transition hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60">
+            {!submitting && <Mail size={18} />}
+            {submitting ? "Sending link..." : "Send reset link"}
+          </button>
+        </form>
+      ) : otpSent ? (
         <form onSubmit={verifyOtp} className="space-y-4">
           <div className="rounded-2xl bg-gold/10 px-4 py-3 text-sm text-stone-600">Enter the {otpLength}-digit code we sent to <strong className="text-ink">{otpEmail}</strong>.</div>
           <label className="block">
@@ -152,6 +195,7 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
             {!submitting && <Mail size={18} />}
             {submitting ? "Sending code..." : "Send verification code"}
           </button>
+          {!isRegistering && <button type="button" onClick={() => { setPasswordResetMode(true); setStatus({ type: "", message: "" }); }} className="w-full text-right text-sm font-semibold text-gold-dark transition hover:text-ink">Forgot password?</button>}
         </form>
       )}
     </AuthFrame>

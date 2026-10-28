@@ -1,20 +1,12 @@
 import { NextResponse } from "next/server";
+import { escapeHtml } from "@/lib/authEmail";
+import { consumeAuthRateLimit, getClientIp } from "@/lib/authRateLimit";
 import { isBrevoConfigured, sendBrevoEmail } from "@/lib/brevo";
 import { createAdminAuthClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "'": "&#39;",
-    '"': "&quot;",
-  })[character]);
 }
 
 export async function POST(request) {
@@ -41,6 +33,14 @@ export async function POST(request) {
   }
 
   try {
+    const rateLimit = await consumeAuthRateLimit({ email, ip: getClientIp(request), emailLimit: 5, ipLimit: 20 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+      );
+    }
+
     const supabase = createAdminAuthClient();
     const { data, error } = await supabase.auth.admin.generateLink({
       type: "magiclink",

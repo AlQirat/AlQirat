@@ -34,7 +34,7 @@ Customer email OTP authentication uses Supabase Auth for session creation and Br
 
 - Authentication > URL Configuration > **Site URL**: your production URL (e.g. the Vercel domain).
 
-The application reads `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME` from `.env` (lowercase equivalents are also accepted). No database migration is required for OTP authentication; the existing customer trigger creates the customer profile when a new OTP user is created.
+The application reads `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME` from `.env` (lowercase equivalents are also accepted). Apply the `20261028_auth_rate_limiting` migration to enable the database-backed email/IP limits for OTP and password-reset requests. The existing customer trigger creates the customer profile when a new OTP user is created. Password recovery uses the same Brevo sender and redirects through `/auth/confirm?next=/reset-password`.
 
 ## Admin dashboard
 

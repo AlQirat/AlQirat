@@ -22,6 +22,9 @@ const defaultMigrations = [
   "20261025_custom_perfume_order_checkout.sql",
   "20261028_razorpay_checkout.sql",
   "20261028_cod_availability.sql",
+  "20261028_auth_rate_limiting.sql",
+  "20261028_auth_rate_limiting_function_fix.sql",
+  "20261028_auth_rate_limiting_function_fix2.sql",
 ];
 
 function loadEnv() {
