@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, Heart, X, ShoppingBag } from "lucide-react";
+import { ChevronDown, Heart, LogIn, UserRound, X, ShoppingBag } from "lucide-react";
 import Logo from "./Logo";
 import SmartImage from "./SmartImage";
 import { useCart } from "./CartProvider";
@@ -173,7 +173,7 @@ export default function MobileSidebar({ open, onClose, items }) {
           </nav>
         </div>
 
-        {/* bottom: CTA */}
+        {/* bottom: cart, wishlist and account actions */}
         <div className="relative border-t border-gold/30 bg-white/80 px-6 pb-6 pt-5 backdrop-blur-sm">
           <a href="/cart" onClick={onClose} className="group relative flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3 pl-6 pr-4 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(21,16,12,0.7)] transition duration-300 hover:-translate-y-0.5 hover:bg-gradient-to-b hover:from-gold-light hover:to-gold hover:text-ink mb-4">
             <ShoppingBag size={18} className="text-gold-light transition group-hover:text-ink" />
@@ -186,10 +186,26 @@ export default function MobileSidebar({ open, onClose, items }) {
             <Heart size={17} fill={wishlistCount ? "currentColor" : "none"} className={wishlistCount ? "text-red-500" : "text-gold-dark"} />
             Wishlist{wishlistCount > 0 ? ` (${wishlistCount})` : ""}
           </a>
-          <a href="/shop" onClick={onClose} className="btn-gold w-full !py-3.5 !text-[15px]">
-            Shop Collection
-          </a>
-
+          <div className="rounded-[1.5rem] border border-gold/25 bg-gradient-to-br from-cream via-white to-gold/10 p-3.5 shadow-[0_14px_30px_-24px_rgba(20,40,26,0.55)]">
+            <div className="mb-3 flex items-center gap-2 px-1">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
+                <UserRound size={16} />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-dark">Your account</p>
+                <p className="text-xs text-stone-500">Save details and track orders</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <a href="/login" onClick={onClose} className="flex items-center justify-center gap-1.5 rounded-full border border-gold/45 bg-white py-3 text-sm font-semibold text-ink transition hover:border-gold hover:bg-gold/10">
+                <LogIn size={16} className="text-gold-dark" />
+                Login
+              </a>
+              <a href="/register" onClick={onClose} className="flex items-center justify-center rounded-full bg-gradient-to-b from-gold-light to-gold py-3 text-sm font-bold text-ink shadow-[0_8px_18px_-10px_rgba(168,122,50,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_22px_-10px_rgba(168,122,50,0.9)]">
+                Register
+              </a>
+            </div>
+          </div>
         </div>
       </aside>
     </div>

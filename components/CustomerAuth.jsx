@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import AuthFrame from "./AuthFrame";
 
+const primaryButtonClass =
+  "flex min-h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-forest px-4 py-3 text-center text-[13px] font-bold uppercase leading-tight tracking-[0.08em] text-white shadow-[0_16px_30px_-18px_rgba(20,40,26,0.9)] transition hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60 sm:px-6 sm:text-sm sm:tracking-[0.12em]";
+
 export default function CustomerAuth({ nextPath, initialError, initialMode = "login" }) {
   const [mode] = useState(initialMode);
   const [status, setStatus] = useState({ type: initialError ? "error" : "", message: initialError || "" });
@@ -150,9 +153,9 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
             </span>
           </label>
           {status.message && <p role={status.type === "error" ? "alert" : "status"} className={`rounded-xl px-4 py-3 text-sm ${status.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{status.message}</p>}
-          <button disabled={submitting} className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-forest px-6 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_16px_30px_-18px_rgba(20,40,26,0.9)] transition hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60">
-            {!submitting && <Mail size={18} />}
-            {submitting ? "Sending link..." : "Send reset link"}
+          <button disabled={submitting} className={primaryButtonClass}>
+            {!submitting && <Mail size={18} className="shrink-0" aria-hidden="true" />}
+            <span className="text-center">{submitting ? "Sending link..." : "Send reset link"}</span>
           </button>
         </form>
       ) : otpSent ? (
@@ -163,9 +166,9 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
             <input name="otp" inputMode="numeric" pattern={`[0-9]{${otpLength}}`} minLength={otpLength} maxLength={otpLength} autoComplete="one-time-code" required className="h-14 w-full rounded-2xl border border-stone-200 bg-white px-4 text-center text-2xl font-bold tracking-[0.45em] outline-none shadow-sm transition focus:border-gold focus:ring-4 focus:ring-gold/10" placeholder={"0".repeat(otpLength)} />
           </label>
           {status.message && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${status.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{status.message}</p>}
-          <button disabled={submitting} className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-forest px-6 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_16px_30px_-18px_rgba(20,40,26,0.9)] transition hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60">
-            {!submitting && <LogIn size={18} />}
-            {submitting ? "Verifying..." : "Verify & Continue"}
+          <button disabled={submitting} className={primaryButtonClass}>
+            {!submitting && <LogIn size={18} className="shrink-0" aria-hidden="true" />}
+            <span className="text-center">{submitting ? "Verifying..." : "Verify & Continue"}</span>
           </button>
           <div className="flex items-center justify-between gap-4 text-sm">
             <button type="button" onClick={() => { setOtpSent(false); setStatus({ type: "", message: "" }); }} className="inline-flex items-center gap-1.5 font-semibold text-stone-500 transition hover:text-ink"><ArrowLeft size={15} /> Change email</button>
@@ -191,9 +194,9 @@ export default function CustomerAuth({ nextPath, initialError, initialMode = "lo
             </span>
           </label>
           {status.message && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${status.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{status.message}</p>}
-          <button disabled={submitting} className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-forest px-6 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_16px_30px_-18px_rgba(20,40,26,0.9)] transition hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60">
-            {!submitting && <Mail size={18} />}
-            {submitting ? "Sending code..." : "Send verification code"}
+          <button disabled={submitting} className={primaryButtonClass}>
+            {!submitting && <Mail size={18} className="shrink-0" aria-hidden="true" />}
+            <span className="text-center">{submitting ? "Sending code..." : "Send verification code"}</span>
           </button>
           {!isRegistering && <button type="button" onClick={() => { setPasswordResetMode(true); setStatus({ type: "", message: "" }); }} className="w-full text-right text-sm font-semibold text-gold-dark transition hover:text-ink">Forgot password?</button>}
         </form>

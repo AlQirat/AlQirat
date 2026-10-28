@@ -141,9 +141,9 @@ export default function Header({ initialCatalog, initialContent }) {
             scrolled ? "border-gold/25 bg-cream/95 shadow-[0_10px_30px_-18px_rgba(20,40,26,0.35)] backdrop-blur" : "border-transparent bg-cream"
           }`}
         >
-          <div className="container-site flex h-[96px] items-center justify-between gap-4">
+          <div className="container-site flex h-[76px] items-center justify-between gap-2 sm:h-[96px] sm:gap-4">
             <a href="/" aria-label={`${brand.name} home`} className="shrink-0">
-              <Logo className="h-[76px]" />
+              <Logo className="h-14 sm:h-[76px]" />
             </a>
 
             <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
@@ -174,7 +174,7 @@ export default function Header({ initialCatalog, initialContent }) {
               <a
                 href="/account"
                 aria-label="Account"
-                className="hidden h-10 w-10 items-center justify-center rounded-full transition hover:bg-gold/15 hover:text-gold-dark sm:flex"
+                className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-gold/15 hover:text-gold-dark"
               >
                 <User size={19} />
               </a>
