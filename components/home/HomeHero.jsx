@@ -84,7 +84,7 @@ export default function HomeHero({ initialContent }) {
             loading={index === 0 ? "eager" : "lazy"}
             fetchPriority={index === 0 ? "high" : "auto"}
             className="absolute inset-0 md:hidden"
-            imgClassName="h-full w-full object-cover object-bottom"
+            imgClassName={`h-full w-full object-cover ${String(item.mobile_image_url || item.desktop_image_url).includes("perfume_banner") ? "object-[72%_bottom]" : "object-bottom"}`}
           />
         </div>
       ))}
