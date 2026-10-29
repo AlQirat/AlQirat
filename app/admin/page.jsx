@@ -22,6 +22,7 @@ const adminSections = new Set([
   "subscribers",
   "custom-perfume",
   "hero-slides",
+  "combo-offer",
   "announcements",
   "delivery",
   "faqs",

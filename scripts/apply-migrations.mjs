@@ -26,6 +26,9 @@ const defaultMigrations = [
   "20261028_auth_rate_limiting.sql",
   "20261028_auth_rate_limiting_function_fix.sql",
   "20261028_auth_rate_limiting_function_fix2.sql",
+  "20261029_combo_hero_slide.sql",
+  "20261029_combo_offers.sql",
+  "20261029_combo_offer_any_quantity.sql",
 ];
 
 function loadEnv() {

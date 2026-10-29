@@ -25,7 +25,7 @@ export default async function AccountPage() {
   const [customerResult, addressResult, ordersResult] = await Promise.allSettled([
     supabase.from("customers").select("id,full_name,email,phone").eq("auth_user_id", user.id).maybeSingle(),
     supabase.from("delivery_addresses").select("id,address_line_1,address_line_2,city,state,postal_code,country").eq("auth_user_id", user.id).eq("is_default", true).limit(1),
-    supabase.from("orders").select("id,order_number,status,payment_status,payment_method,total,created_at,shipping_address,custom_perfume_request_id,fulfillment_status,shiprocket_order_id,shiprocket_shipment_id,shiprocket_awb,shiprocket_courier_name,shiprocket_status,shiprocket_status_id,shiprocket_label_url,shiprocket_tracking_url,shiprocket_last_event_at,order_items(id,product_id,product_name,variant_label,unit_price,quantity,line_total,products(image_url))").order("created_at", { ascending: false }),
+    supabase.from("orders").select("id,order_number,status,payment_status,payment_method,subtotal,discount_amount,shipping_amount,total,created_at,shipping_address,custom_perfume_request_id,fulfillment_status,shiprocket_order_id,shiprocket_shipment_id,shiprocket_awb,shiprocket_courier_name,shiprocket_status,shiprocket_status_id,shiprocket_label_url,shiprocket_tracking_url,shiprocket_last_event_at,order_items(id,product_id,product_name,variant_label,unit_price,quantity,line_total,combo_offer_id,products(image_url))").order("created_at", { ascending: false }),
   ]);
 
   const customerResponse = customerResult.status === "fulfilled" ? customerResult.value : null;

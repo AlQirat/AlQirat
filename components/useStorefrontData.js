@@ -7,7 +7,8 @@ import { getProductKey, mapStorefrontProduct } from "@/lib/storefrontProducts";
 export { mapStorefrontProduct };
 
 const emptyCatalog = { products: [], categories: [] };
-const emptyContent = { hero_slides: [], announcements: [], delivery_settings: null, faqs: [] };
+const emptyContent = { hero_slides: [], announcements: [], delivery_settings: null, faqs: [], combo_offer: null };
+const emptyComboOffer = { offer: null };
 const POLL_MS = 10000;
 
 // One shared store per endpoint, so the header, cart, featured products and the shop page all read the
@@ -108,4 +109,8 @@ export function useStorefrontCategories(initialCatalog) {
 
 export function useStorefrontContent(initialValue = emptyContent) {
   return useLiveEndpoint("/api/storefront/content", initialValue);
+}
+
+export function useStorefrontComboOffer(initialValue = emptyComboOffer) {
+  return useLiveEndpoint("/api/storefront/combo", initialValue);
 }

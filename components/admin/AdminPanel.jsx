@@ -8,6 +8,7 @@ import {
   CircleHelp,
   ClipboardList,
   FolderTree,
+  Gift,
   Image as ImageIcon,
   LayoutDashboard,
   Mail,
@@ -31,6 +32,7 @@ import AdminProducts from "@/components/admin/AdminProducts";
 import AdminInquiries from "@/components/admin/AdminInquiries";
 import AdminSubscribers from "@/components/admin/AdminSubscribers";
 import AdminCustomPerfume from "@/components/admin/AdminCustomPerfume";
+import AdminComboOffer from "@/components/admin/AdminComboOffer";
 import { AdminContentManager, AdminDeliverySettings, AdminReviews } from "@/components/admin/AdminContent";
 
 const navigation = [
@@ -44,6 +46,7 @@ const navigation = [
   { id: "subscribers", label: "Subscribers", icon: Mail },
   { id: "custom-perfume", label: "Custom Perfume Requests", icon: Star },
   { id: "hero-slides", label: "Hero Slides", icon: ImageIcon },
+  { id: "combo-offer", label: "Combo Offer", icon: Gift },
   { id: "announcements", label: "Announcements", icon: BellRing },
   { id: "delivery", label: "Delivery Settings", icon: Truck },
   { id: "faqs", label: "Global FAQs", icon: CircleHelp },
@@ -191,6 +194,7 @@ function renderModule(active) {
   if (active === "subscribers") return <AdminSubscribers />;
   if (active === "custom-perfume") return <AdminCustomPerfume />;
   if (active === "hero-slides") return <AdminContentManager resource="hero-slides" />;
+  if (active === "combo-offer") return <AdminComboOffer />;
   if (active === "announcements") return <AdminContentManager resource="announcements" />;
   if (active === "delivery") return <AdminDeliverySettings />;
   return <AdminContentManager resource="faqs" />;

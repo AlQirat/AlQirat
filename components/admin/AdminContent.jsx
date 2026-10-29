@@ -78,7 +78,7 @@ function ContentForm({ resource, item, onSaved, onCancel }) {
     <label className="text-sm font-semibold">Sort order<input name="sort_order" type="number" step="1" defaultValue={item?.sort_order ?? 0} className={inputClass} /></label>
     <label className="flex items-center gap-3 self-end pb-3 text-sm font-semibold"><input name="is_active" type="checkbox" defaultChecked={item?.is_active ?? true} className="h-4 w-4 accent-[#C99A4B]" /> Active on storefront</label>
     {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2">{error}</p>}
-    {isHeroSlide && <p className="text-xs font-normal text-stone-500 sm:col-span-2">Add multiple active slides to rotate them automatically every 2 seconds.</p>}
+    {isHeroSlide && <p className="text-xs font-normal text-stone-500 sm:col-span-2">Active slides rotate automatically every 3 seconds on the storefront.</p>}
     <div className="flex justify-end gap-3 sm:col-span-2"><button type="button" onClick={onCancel} className="rounded-xl border px-5 py-3 text-sm font-semibold">Cancel</button><button disabled={saving} className="flex items-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Save size={16} />{saving ? "Saving..." : "Save"}</button></div>
   </form>;
 }

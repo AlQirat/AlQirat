@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createProductSlug } from "@/lib/productCatalog";
-import { useStorefrontCatalog } from "./useStorefrontData";
+import { calculateComboPricing, mergeComboSelections } from "@/lib/comboPricing";
+import { useStorefrontCatalog, useStorefrontComboOffer } from "./useStorefrontData";
 
 const STORAGE_KEY = "al_qirat_cart";
 const CartContext = createContext(null);
@@ -22,12 +23,41 @@ function normalizeCartItem(product, quantity) {
   };
 }
 
+function normalizeComboCartItem(offer, selections) {
+  const pricing = calculateComboPricing(offer, selections);
+  return {
+    kind: "combo",
+    slug: `combo-${offer.id}`,
+    offerId: offer.id,
+    offerSlug: offer.slug,
+    name: offer.name || offer.title,
+    src: offer.banner_image_url,
+    quantity: 1,
+    totalQuantity: pricing.totalQuantity,
+    price: pricing.total,
+    selections: pricing.lines.map((selection) => ({
+      product_id: selection.product_id,
+      name: selection.name,
+      slug: selection.slug,
+      src: selection.image_url || selection.src,
+      stock_quantity: selection.stock_quantity,
+      unit_price: selection.unit_price,
+      quantity: selection.quantity,
+    })),
+  };
+}
+
+export function getCartLineTotal(item) {
+  return item.kind === "combo" ? Number(item.price) : Number(item.price) * Number(item.quantity);
+}
+
 function persistCart(items) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
 export function CartProvider({ children }) {
   const { products: catalogProducts, error: catalogError } = useStorefrontCatalog();
+  const { data: comboData } = useStorefrontComboOffer();
   const [items, setItems] = useState([]);
   const itemsRef = useRef([]);
   const [loaded, setLoaded] = useState(false);
@@ -50,6 +80,13 @@ export function CartProvider({ children }) {
     if (!loaded || !catalogProducts.length) return;
     const currentItems = itemsRef.current;
     const nextItems = currentItems.map((item) => {
+      if (item.kind === "combo") {
+        if (!comboData.offer || comboData.offer.id !== item.offerId) return item;
+        const eligibleIds = new Set(comboData.offer.products.map((product) => String(product.product_id || product.id)));
+        const stale = item.selections.some((selection) => !eligibleIds.has(String(selection.product_id)));
+        const refreshed = normalizeComboCartItem(comboData.offer, item.selections);
+        return { ...refreshed, stale };
+      }
         const itemProductSlug = item.productSlug || item.slug.replace(/-(6ml|12ml)$/, "");
         const product = catalogProducts.find(
           (candidate) => (candidate.slug || createProductSlug(candidate.name)) === itemProductSlug,
@@ -81,7 +118,7 @@ export function CartProvider({ children }) {
       persistCart(nextItems);
       setItems(nextItems);
     }
-  }, [catalogProducts, loaded]);
+  }, [catalogProducts, comboData.offer, loaded]);
 
   const addItem = useCallback((product, quantity = 1) => {
     const nextItem = normalizeCartItem(product, quantity);
@@ -96,6 +133,50 @@ export function CartProvider({ children }) {
     persistCart(nextItems);
     setItems(nextItems);
   }, []);
+
+  const addComboItem = useCallback((offer, selections) => {
+    const currentItems = itemsRef.current;
+    const existing = currentItems.find((item) => item.kind === "combo" && item.offerId === offer.id);
+    const mergedSelections = existing ? mergeComboSelections(existing.selections, selections) : selections;
+    const nextCombo = normalizeComboCartItem(offer, mergedSelections);
+    const nextItems = existing
+      ? currentItems.map((item) => item.slug === existing.slug ? nextCombo : item)
+      : [...currentItems, nextCombo];
+    itemsRef.current = nextItems;
+    persistCart(nextItems);
+    setItems(nextItems);
+  }, []);
+
+  const updateComboSelection = useCallback((slug, productId, quantity) => {
+    const offer = comboData.offer;
+    const currentItems = itemsRef.current;
+    const item = currentItems.find((candidate) => candidate.kind === "combo" && candidate.slug === slug);
+    const product = offer?.products?.find((candidate) => String(candidate.product_id || candidate.id) === String(productId));
+    if (!offer || !item || !product) return;
+
+    const currentSelection = item.selections.find((selection) => String(selection.product_id) === String(productId));
+    const currentQuantity = Number(currentSelection?.quantity || 0);
+    const maximumTotal = Math.max(1, Number(offer.max_quantity) || 1);
+    const maximumPerProduct = Math.max(1, Number(offer.max_quantity_per_product) || maximumTotal);
+    const availableStock = Number(product.stock_quantity);
+    const stockLimit = Number.isFinite(availableStock) && availableStock > 0 ? availableStock : currentQuantity;
+    const requestedQuantity = Math.max(0, Number(quantity) || 0);
+    const maximumByOffer = Math.max(0, maximumTotal - (item.totalQuantity - currentQuantity));
+    const sameProductLimit = offer.allow_same_product === false ? 1 : maximumPerProduct;
+    if (!currentSelection && offer.allow_mixed_products === false && item.selections.length > 0) return;
+    const nextQuantity = Math.min(requestedQuantity, sameProductLimit, stockLimit, maximumByOffer);
+    const nextSelections = item.selections
+      .map((selection) => String(selection.product_id) === String(productId) ? { ...product, ...selection, product_id: String(productId), quantity: nextQuantity } : selection)
+      .filter((selection) => selection.quantity > 0);
+
+    if (!currentSelection && nextQuantity > 0) nextSelections.push({ ...product, product_id: String(productId), quantity: nextQuantity });
+    const nextItems = nextSelections.length === 0
+      ? currentItems.filter((candidate) => candidate.slug !== slug)
+      : currentItems.map((candidate) => candidate.slug === slug ? normalizeComboCartItem(offer, nextSelections) : candidate);
+    itemsRef.current = nextItems;
+    persistCart(nextItems);
+    setItems(nextItems);
+  }, [comboData.offer]);
 
   const updateQuantity = useCallback((slug, quantity) => {
     const nextItems = itemsRef.current
@@ -118,11 +199,11 @@ export function CartProvider({ children }) {
     persistCart([]);
     setItems([]);
   }, []);
-  const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-  const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+  const itemCount = items.reduce((total, item) => total + (item.kind === "combo" ? item.totalQuantity : item.quantity), 0);
+  const subtotal = items.reduce((total, item) => total + getCartLineTotal(item), 0);
   const value = useMemo(
-    () => ({ items, itemCount, subtotal, catalogProducts, catalogError, addItem, updateQuantity, removeItem, clearCart }),
-    [items, itemCount, subtotal, catalogProducts, catalogError, addItem, updateQuantity, removeItem, clearCart],
+    () => ({ items, itemCount, subtotal, catalogProducts, catalogError, addItem, addComboItem, updateComboSelection, updateQuantity, removeItem, clearCart }),
+    [items, itemCount, subtotal, catalogProducts, catalogError, addItem, addComboItem, updateComboSelection, updateQuantity, removeItem, clearCart],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

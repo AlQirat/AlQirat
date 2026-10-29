@@ -93,8 +93,9 @@ export default function CustomerCheckout({ user, customer, address }) {
       const { data: savedAddress, error: addressError } = await addressQuery;
       if (addressError) throw addressError;
 
-      const cartItems = items.map((item) => ({ slug: item.productSlug || item.slug, quantity: item.quantity, variant_size: item.variant?.size || null }));
-      const { error: cartError } = await supabase.rpc("save_customer_cart", { p_items: cartItems });
+      const cartItems = items.filter((item) => item.kind !== "combo").map((item) => ({ slug: item.productSlug || item.slug, quantity: item.quantity, variant_size: item.variant?.size || null }));
+      const comboItems = items.filter((item) => item.kind === "combo").flatMap((item) => item.selections.map((selection) => ({ offer_id: item.offerId, product_id: selection.product_id, quantity: selection.quantity })));
+      const { error: cartError } = await supabase.rpc("save_customer_cart_v2", { p_items: cartItems, p_combo_items: comboItems });
       if (cartError) throw cartError;
 
       if (paymentMethod === "cod") {
@@ -207,7 +208,12 @@ export default function CustomerCheckout({ user, customer, address }) {
             <div className="flex items-center gap-2"><ShoppingBag size={20} className="text-gold-dark" /><h2 className="text-xl font-bold">Your cart</h2></div>
             <div className="mt-5 space-y-4">
               {items.length === 0 && <p className="rounded-2xl bg-cream p-5 text-sm text-stone-500">Your cart is empty. <a className="font-semibold text-gold-dark" href="/all-products">Browse products</a></p>}
-              {items.map((item) => (
+              {items.map((item) => item.kind === "combo" ? (
+                <div key={item.slug} className="flex gap-3 border-b border-stone-100 pb-4">
+                  <SmartImage src={item.src} alt={item.name} className="h-20 w-20 shrink-0 rounded-xl" imgClassName="h-full w-full object-cover" />
+                  <div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><p className="truncate font-semibold">{item.name}</p><p className="font-semibold">₹{item.price}</p></div><p className="mt-1 text-sm text-gold-dark">{item.totalQuantity} perfumes · {item.selections.map((selection) => `${selection.name} × ${selection.quantity}`).join(" · ")}</p><button type="button" onClick={() => removeItem(item.slug)} className="mt-2 text-xs font-semibold text-stone-400 hover:text-red-600">Remove combo</button></div>
+                </div>
+              ) : (
                 <div key={item.slug} className="flex gap-3 border-b border-stone-100 pb-4">
                   <SmartImage src={item.src} alt={item.name} className="h-20 w-20 shrink-0 rounded-xl" imgClassName="h-full w-full object-cover" />
                   <div className="min-w-0 flex-1">

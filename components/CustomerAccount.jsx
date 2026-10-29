@@ -135,7 +135,7 @@ function OrderCard({ order }) {
           <p className="mt-2 text-sm text-stone-500">Placed {formatDate(order.created_at)}</p>
           <p className="mt-3 text-sm text-stone-500">Payment: <span className={order.payment_status === "paid" ? "font-semibold text-emerald-700" : "font-semibold text-stone-700"}>{paymentStatus}</span></p>
         </div>
-        <p className="text-2xl font-bold text-ink">{formatCurrency(order.total)}</p>
+        <div className="text-right"><p className="text-2xl font-bold text-ink">{formatCurrency(order.total)}</p>{Number(order.discount_amount) > 0 && <p className="mt-1 text-xs font-semibold text-emerald-700">Combo savings {formatCurrency(order.discount_amount)}</p>}</div>
       </div>
       <div className="mt-7 divide-y rounded-2xl border border-stone-200 bg-white">
         {items.map((item) => <div key={item.id} className="flex items-center gap-4 px-4 py-4 sm:px-5"><SmartImage src={item.products?.image_url} alt={item.product_name} className="h-16 w-16 shrink-0 rounded-xl" imgClassName="h-full w-full object-cover" fallback={<div className="flex h-full items-center justify-center text-gold-dark"><ShoppingBag size={22} /></div>} /><div className="min-w-0 flex-1"><p className="font-semibold">{item.product_name}</p><p className="mt-1 text-sm text-stone-500">Quantity {item.quantity}{item.variant_label ? ` - ${item.variant_label}` : ""}</p></div><p className="font-semibold">{formatCurrency(item.line_total)}</p></div>)}
