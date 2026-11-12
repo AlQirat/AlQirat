@@ -9,6 +9,7 @@ import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "../CartProvider";
 import { useWishlist } from "../WishlistProvider";
 import { useStorefrontCatalog } from "../useStorefrontData";
+import PriceDisplay from "../PriceDisplay";
 
 const MAX_FEATURED = 8;
 
@@ -98,7 +99,7 @@ export default function FeaturedProducts({ initialCatalog }) {
                         <span className="text-[11.5px] text-ink/50">({product.reviews})</span>
                       </div>
                     )}
-                    <p className="mt-2 text-lg font-semibold text-ink">₹ {Number(product.price).toLocaleString("en-IN")}</p>
+                    <PriceDisplay price={product.price} compareAtPrice={product.compareAtPrice} className="mt-2 justify-center" priceClassName="text-lg font-semibold text-ink" mrpClassName="text-[10px] font-medium text-stone-400" />
                     <button
                       type="button"
                       onClick={() => add(product)}

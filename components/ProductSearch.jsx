@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import SmartImage from "./SmartImage";
+import PriceDisplay from "./PriceDisplay";
 
 function searchableText(product) {
   return [product.name, product.desc, product.description, product.category, product.subCategory]
@@ -90,7 +91,7 @@ export default function ProductSearch({ expanded = false, onNavigate }) {
                     <span className="block truncate text-sm font-semibold text-ink">{product.name}</span>
                     <span className="mt-0.5 block truncate text-xs text-stone-500">{product.category} · {product.subCategory}</span>
                   </span>
-                  <span className="text-sm font-bold text-gold-dark">₹{product.price}</span>
+                  <PriceDisplay price={product.price} compareAtPrice={product.compareAtPrice} className="justify-end" priceClassName="text-sm font-bold text-gold-dark" mrpClassName="text-[9px] font-medium text-stone-400" />
                 </Link>
               ))}
             </div>

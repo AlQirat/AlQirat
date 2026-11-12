@@ -13,6 +13,7 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
   const contexts = [];
   const pageErrors = [];
   let originalSettings;
+  let guestId;
   let id;
   const baseURL = testInfo.project.use.baseURL;
   const check = (result) => { if (result.error) throw new Error(`Fixture operation failed: ${result.error.message || result.error.code || result.error.status || "unknown"}`); return result.data; };
@@ -52,24 +53,39 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
     check(await service.from("custom_perfume_settings").update({ enabled: true, homepage_enabled: true }).eq("id", true));
 
     expect((await request.get("/api/custom-perfume/requests")).status()).toBe(401);
-    expect((await request.post("/api/custom-perfume/requests", { data: {} })).status()).toBe(401);
+    expect((await request.post("/api/custom-perfume/requests", { data: {} })).status()).toBe(400);
     expect((await request.get("/api/admin/custom-perfume/requests")).status()).toBe(401);
     expect((await request.put("/api/admin/custom-perfume/settings", { data: { enabled: false, homepage_enabled: false } })).status()).toBe(401);
     expect((await request.patch(`/api/admin/custom-perfume/requests/${randomUUID()}`, { data: {} })).status()).toBe(401);
+
+    const guestContext = await browser.newContext({ baseURL });
+    contexts.push(guestContext);
+    const guestPage = await guestContext.newPage();
+    guestPage.on("pageerror", (error) => pageErrors.push(error.message));
+    await guestPage.goto("/custom-perfume");
+    await expect(guestPage.getByRole("button", { name: "Submit My Request" })).toBeVisible({ timeout: 20000 });
+    await guestPage.locator('[name="reference_brand"]').fill("Guest inspiration");
+    await guestPage.locator('[name="reference_name"]').fill("Guest amber garden");
+    await guestPage.locator('[name="contact_email"]').fill("guest@example.com");
+    await guestPage.locator('[name="contact_phone"]').fill("0000000000");
+    const guestSubmission = guestPage.waitForResponse((response) => response.url().endsWith("/api/custom-perfume/requests") && response.request().method() === "POST");
+    await guestPage.getByRole("button", { name: "Submit My Request" }).click();
+    const guestResponse = await guestSubmission;
+    expect(guestResponse.status()).toBe(201);
+    guestId = (await guestResponse.json()).request.id;
+    await expect(guestPage.getByRole("heading", { name: "Your inspiration is with us" })).toBeVisible();
+    const guestRetry = await guestContext.request.post("/api/custom-perfume/requests", { data: {
+      id: guestId, reference_brand: "Guest inspiration", reference_name: "Guest amber garden", contact_email: "guest@example.com", contact_phone: "0000000000",
+    } });
+    expect(guestRetry.status()).toBe(200);
 
     const { page, context } = await loginCustomer();
     await expect(page.getByRole("button", { name: "Submit My Request" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('[name="reference_brand"]').fill("Test inspiration");
     await page.locator('[name="reference_name"]').fill("Test amber garden");
-    await page.locator('[name="fragrance_notes"]').fill("Rose, amber and sandalwood");
-    await page.locator('[name="scent_preferences"]').fill("Warm and soft for evening wear");
-    await page.locator('[name="bottle_size"]').selectOption("50");
-    await page.locator('[name="budget"]').fill("1500");
-    await page.locator('[name="reference_url"]').fill("https://example.com/fragrance");
+    await page.locator('[name="contact_email"]').fill("customer@example.com");
     await page.locator('[name="contact_phone"]').fill("0000000000");
-    await page.locator('[name="instructions"]').fill("Avoid strong citrus.");
-    await page.locator('[name="profile_acknowledged"]').check();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("customer-mobile.png"), fullPage: true });
     const submission = page.waitForResponse((response) => response.url().endsWith("/api/custom-perfume/requests") && response.request().method() === "POST");
@@ -80,7 +96,7 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
     await expect(page.getByRole("heading", { name: "Your inspiration is with us" })).toBeVisible();
 
     const retry = await context.request.post("/api/custom-perfume/requests", { data: {
-      id, reference_brand: "Test inspiration", reference_name: "Test amber garden", fragrance_notes: "Rose, amber and sandalwood", scent_preferences: "Warm and soft for evening wear", bottle_size: 50, budget: 1500, reference_url: "https://example.com/fragrance", contact_name: "Scent Test Customer", contact_email: "test@example.com", contact_phone: "0000000000", instructions: "", profile_acknowledged: true,
+      id, reference_brand: "Test inspiration", reference_name: "Test amber garden", contact_email: "customer@example.com", contact_phone: "0000000000",
     } });
     expect(retry.status()).toBe(200);
     const own = await (await context.request.get("/api/custom-perfume/requests")).json();
@@ -107,6 +123,15 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
     admin.on("pageerror", (error) => pageErrors.push(error.message));
     await admin.goto("/admin?section=custom-perfume");
     await expect(admin.getByRole("heading", { name: "Custom Perfume Requests" })).toBeVisible();
+    await expect(admin.getByRole("article").filter({ hasText: "Guest amber garden" })).toBeVisible();
+    await admin.getByRole("article").filter({ hasText: "Guest amber garden" }).getByRole("button", { name: "Manage Request" }).click();
+    await expect(admin.getByRole("dialog")).toContainText("Guest request");
+    await admin.locator('[name="status"]').selectOption("quoted");
+    await admin.locator('[name="quotation_amount"]').fill("1700");
+    await admin.locator('[name="quotation_details"]').fill("Guest quotation for a similar fragrance profile.");
+    await admin.locator('[name="internal_notes"]').fill("PRIVATE GUEST TEST NOTE");
+    await admin.getByRole("button", { name: "Save Request", exact: true }).click();
+    await expect(admin.getByRole("dialog")).toHaveCount(0);
     await admin.getByRole("article").filter({ hasText: "Test amber garden" }).getByRole("button", { name: "Manage Request" }).click();
     await admin.locator('[name="status"]').selectOption("quoted");
     await admin.locator('[name="quotation_amount"]').fill("1800");
@@ -170,6 +195,7 @@ test("signature scent: submission, ownership, admin quotation, live updates and 
   } finally {
     for (const context of contexts) await context.close();
     if (originalSettings) check(await service.from("custom_perfume_settings").update(originalSettings).eq("id", true));
+    if (guestId) check(await service.from("custom_perfume_requests").delete().eq("id", guestId));
     for (const userId of users) {
       check(await service.from("customers").delete().eq("auth_user_id", userId));
       check(await service.auth.admin.deleteUser(userId));

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Heart, ShoppingCart, Star, StarHalf, Tag, Filter, ChevronDown } from "lucide-react";
 import SmartImage from "./SmartImage";
+import PriceDisplay from "./PriceDisplay";
 import Reveal from "./Reveal";
 import Particles from "./Particles";
 import { getProductPath } from "@/lib/productCatalog";
@@ -368,19 +369,19 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
             </p>
 
         {/* Grid: 3 cols desktop, 2 tablet, 1 mobile */}
-        <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {paginatedProducts.map((p, i) => {
             const isAdded = added.has(p.name);
             const liked = isWishlisted(p);
             return (
-              <Reveal key={p.name} delay={i * 40}>
-                <article className="group relative h-full select-none overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] ring-1 ring-stone-200 transition duration-500 hover:-translate-y-3 hover:shadow-[0_34px_60px_-20px_rgba(201,154,75,0.6)] hover:ring-gold/70">
+              <Reveal key={p.name} delay={i * 40} className="h-full">
+                <article className="group relative flex h-full min-w-0 select-none flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] ring-1 ring-stone-200 transition duration-500 hover:-translate-y-3 hover:shadow-[0_34px_60px_-20px_rgba(201,154,75,0.6)] hover:ring-gold/70">
                   <SmartImage
                     src={p.src}
                     alt={p.name}
                     tone={p.tone}
-                    className="aspect-square w-full"
-                    imgClassName="pointer-events-none h-full w-full object-contain transition duration-700 group-hover:brightness-105"
+                    className="relative aspect-[2/3] w-full shrink-0"
+                    imgClassName="pointer-events-none block h-full w-full object-contain transition duration-700 group-hover:brightness-105"
                   >
                     {/* Depth gradient */}
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
@@ -405,11 +406,11 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
                           : p.badge === "Limited"
                           ? "bg-gradient-to-b from-rose-500 to-rose-700 text-white"
                           : p.badge === "Premium"
-                          ? "bg-gradient-to-b from-purple-500 to-purple-700 text-white"
+                          ? "bg-gradient-to-b from-gold-light to-gold text-ink"
                           : p.badge === "Popular"
                           ? "bg-gradient-to-b from-blue-500 to-blue-700 text-white"
                           : p.badge === "Exclusive"
-                          ? "bg-gradient-to-b from-purple-500 to-purple-700 text-white"
+                          ? "bg-gradient-to-b from-gold-light to-gold text-ink"
                           : p.badge === "Featured"
                           ? "bg-gradient-to-b from-emerald-500 to-emerald-700 text-white"
                           : p.badge === "Seasonal"
@@ -441,29 +442,26 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
                     </a>
                   </SmartImage>
 
-                  <div className="p-3">
+                  <div className="min-w-0 p-3">
                     <div>
-                      <h3 className="break-words text-base font-bold leading-snug text-ink">
+                      <h3 className="line-clamp-2 break-words text-base font-bold leading-snug text-ink">
                         <a href={getProductPath(p)} className="transition hover:text-gold-dark">
                           {p.name}
                         </a>
                       </h3>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-stone-500 line-clamp-1">{p.desc}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">{p.desc}</p>
                     {p.reviews > 0 && (
-                      <div className="mt-1.5 flex items-center gap-1">
+                      <div className="mt-1.5 flex min-h-[18px] items-center gap-1">
                         <Stars value={p.rating} />
                         <span className="text-[11px] font-semibold text-ink">{p.rating}</span>
                         <span className="text-[11px] text-stone-400">({p.reviews})</span>
                       </div>
                     )}
-                    <p className="mt-2 text-xl font-bold text-ink">
-                      <span className="mr-0.5 text-base font-semibold text-gold-dark">₹</span>
-                      {p.price}
-                    </p>
+                    <PriceDisplay price={p.price} compareAtPrice={p.compareAtPrice} showMrpAfterPrice className="mt-2" priceClassName="text-xl font-bold text-ink" mrpClassName="text-xs font-medium text-stone-400" />
                     <button
                       onClick={() => { addItem(p, 1); toggle(setAdded, p.name, 1800); }}
-                      className={`btn-gold-sm relative mt-2.5 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-xl py-2.5 text-[12px] font-semibold transition duration-300 ${
+                      className={`btn-gold-sm relative mt-2 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-xl py-2.5 text-[12px] font-semibold transition duration-300 ${
                         isAdded
                           ? "bg-emerald-600 text-white"
                           : "bg-ink text-white hover:bg-gradient-to-b hover:from-gold-light hover:to-gold hover:text-ink"

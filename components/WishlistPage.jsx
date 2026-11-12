@@ -7,6 +7,7 @@ import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import { getWishlistKey, useWishlist } from "./WishlistProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
+import PriceDisplay from "./PriceDisplay";
 
 export default function WishlistPage() {
   const { addItem } = useCart();
@@ -65,7 +66,7 @@ export default function WishlistPage() {
                     <h2 className="mt-1.5 break-words text-sm font-bold leading-snug sm:text-base">
                       <a href={getProductPath(product)} className="transition hover:text-gold-dark">{product.name}</a>
                     </h2>
-                    <p className="mt-2 text-xl font-bold"><span className="mr-0.5 text-base text-gold-dark">₹</span>{product.price}</p>
+                    <PriceDisplay price={product.price} compareAtPrice={product.compareAtPrice} className="mt-2" priceClassName="text-xl font-bold" mrpClassName="text-[10px] font-medium text-stone-400" />
                     <button type="button" onClick={() => addItem(product, 1)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-ink py-2.5 text-xs font-semibold text-white transition hover:bg-gradient-to-b hover:from-gold-light hover:to-gold hover:text-ink">
                       <ShoppingCart size={14} /> Add to Cart
                     </button>

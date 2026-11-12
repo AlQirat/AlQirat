@@ -17,9 +17,10 @@ function normalizeCartItem(product, quantity) {
     productSlug,
     name: product.name + (variant ? ` (${variant.size})` : ""),
     price: Number(variant?.price ?? product.price),
+    compareAtPrice: Number(variant?.compare_at_price ?? product.compareAtPrice) || null,
     src: product.src,
     quantity: Math.max(1, Number(quantity) || 1),
-    variant: variant ? { size: variant.size, price: variant.price } : null,
+    variant: variant ? { size: variant.size, price: variant.price, compare_at_price: variant.compare_at_price } : null,
   };
 }
 
@@ -108,6 +109,7 @@ export function CartProvider({ children }) {
           productSlug: itemProductSlug,
           name: product.name + (variant ? ` (${variant.size})` : ""),
           price: Number(variant?.price ?? product.price),
+          compareAtPrice: Number(variant?.compare_at_price ?? product.compareAtPrice) || null,
           src: product.src,
           quantity,
         };

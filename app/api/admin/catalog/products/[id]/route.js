@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminCatalogClient, createSlug, isAuthorizedAdminRequest } from "@/lib/adminCatalog";
+import { normalizeFragranceNotes } from "@/lib/fragranceNotes";
 
 function normalizeVariants(value) {
   if (value === undefined) return [];
@@ -9,21 +10,25 @@ function normalizeVariants(value) {
   return value.map((variant, index) => {
     const size = String(variant?.size || "").trim();
     const price = Number(variant?.price);
+    const compareAtPrice = variant?.compare_at_price === undefined || variant?.compare_at_price === null || variant?.compare_at_price === "" ? null : Number(variant.compare_at_price);
     const stock = variant?.stock === undefined || variant?.stock === "" ? null : Number(variant.stock);
     if (!size || !Number.isFinite(price) || price < 0) throw new Error(`Size option ${index + 1} must have a valid size and price.`);
+    if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < price)) throw new Error(`MRP for ${size} must be greater than or equal to its selling price.`);
     if (sizes.has(size.toLowerCase())) throw new Error(`Size option “${size}” is repeated.`);
     if (stock !== null && (!Number.isInteger(stock) || stock < 0)) throw new Error(`Stock for ${size} must be a valid whole number.`);
     sizes.add(size.toLowerCase());
-    return { size, price, ...(stock === null ? {} : { stock }) };
+    return { size, price, ...(compareAtPrice === null ? {} : { compare_at_price: compareAtPrice }), ...(stock === null ? {} : { stock }) };
   });
 }
 
 function buildPayload(body) {
   const name = String(body.name || "").trim();
   const price = Number(body.price);
+  const compareAtPrice = body.compare_at_price === undefined || body.compare_at_price === null || body.compare_at_price === "" ? null : Number(body.compare_at_price);
   const stockQuantity = Number(body.stock_quantity);
   if (!name || !body.category_id || !body.image_url) throw new Error("Name, category, and product image are required.");
   if (!Number.isFinite(price) || price < 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) throw new Error("Price or stock quantity is invalid.");
+  if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < price)) throw new Error("MRP must be greater than or equal to the selling price.");
   return {
     name,
     slug: createSlug(name),
@@ -32,8 +37,10 @@ function buildPayload(body) {
     short_description: String(body.short_description || "").trim() || name,
     description: String(body.description || "").trim() || null,
     price,
+    compare_at_price: compareAtPrice,
     stock_quantity: stockQuantity,
     variants: normalizeVariants(body.variants),
+    fragrance_notes: normalizeFragranceNotes(body.fragrance_notes || {}),
     image_url: String(body.image_url).trim(),
     gallery_urls: Array.isArray(body.gallery_urls) ? [...new Set(body.gallery_urls.map((url) => String(url).trim()).filter(Boolean))] : [],
     badge: String(body.badge || "").trim() || null,

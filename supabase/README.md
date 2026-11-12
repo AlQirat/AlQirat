@@ -57,11 +57,12 @@ It is safe to paste the migration into Supabase SQL Editor more than once. If
 the feature is already installed; the SQL Editor version is guarded so an existing installation
 does not fail with `relation already exists`.
 
-Customers sign in at `/custom-perfume` and track quotations and status history in
-`/account#custom-perfume-requests`. Admins manage availability, status, quotations in INR, and
-private notes at `/admin?section=custom-perfume`. Hiding the homepage section does not disable
-submissions; disabling the feature blocks new submissions at the database boundary. Existing
-requests remain readable. Updates refresh every ten seconds, on window focus, and after
+Anyone can submit the four-field enquiry form at `/custom-perfume` without an account. Authenticated
+customers can additionally track their own quotations and status history in
+`/account#custom-perfume-requests`. Admins manage guest and customer requests, availability, status,
+quotations in INR, and private notes at `/admin?section=custom-perfume`. Hiding the homepage section
+does not disable submissions; disabling the feature blocks new submissions at the database boundary.
+Existing requests remain readable. Updates refresh every ten seconds, on window focus, and after
 admin changes in another tab. No Realtime publication or email provider is required.
 Notifications are persistent account updates, not outgoing emails.
 
@@ -73,8 +74,9 @@ in Orders with a Custom scent label. Submitting an enquiry or publishing a quota
 an order or collects payment. The RPC is ownership-checked, idempotent, and does not use service-role
 credentials in the browser.
 
-Customer insert grants allow only submission fields and the retry identifier. Ownership is
-derived from `auth.uid()`; customers cannot update statuses, quotations, notes, or settings.
+Guest and customer insert grants allow only the brand, model/fragrance name, email, phone, and retry
+identifier. Customer ownership is derived from `auth.uid()` while guest rows remain unowned; neither
+can update statuses, quotations, notes, or settings.
 Internal notes have a separate table with no customer grants or policies. The admin update
 RPC is service-role-only and uses a version check to prevent lost updates.
 

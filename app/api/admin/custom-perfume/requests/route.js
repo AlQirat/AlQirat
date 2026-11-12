@@ -12,7 +12,7 @@ export async function GET(request) {
     const status = params.get("status") || "all";
     const page = Number(params.get("page") || 1);
     if (!Number.isInteger(page) || page < 1 || page > 100000 || (status !== "all" && !Object.hasOwn(SCENT_STATUSES, status))) throw new ScentValidationError("Invalid request filter.");
-    let query = createAdminCatalogClient().from("custom_perfume_requests").select(`${REQUEST_FIELDS},custom_perfume_internal_notes(notes)`, { count: "exact" });
+    let query = createAdminCatalogClient().from("custom_perfume_requests").select(`${REQUEST_FIELDS},auth_user_id,custom_perfume_internal_notes(notes)`, { count: "exact" });
     if (status !== "all") query = query.eq("status", status);
     const { data, error, count } = await query.order("created_at", { ascending: false }).range((page - 1) * 20, page * 20 - 1);
     if (error) throw error;

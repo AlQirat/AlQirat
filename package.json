@@ -10,7 +10,9 @@
     "test:custom-perfume:db": "node scripts/test-custom-perfume-db.mjs",
     "test:custom-perfume:e2e": "playwright test tests/custom-perfume.spec.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
-    "db:seed": "node scripts/seed-catalog.mjs"
+    "db:seed": "node scripts/seed-catalog.mjs",
+    "db:seed-new-products": "node scripts/seed-new-products.mjs",
+    "db:remove-legacy-products": "node scripts/remove-legacy-products.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

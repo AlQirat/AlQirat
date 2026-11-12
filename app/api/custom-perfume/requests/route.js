@@ -29,19 +29,19 @@ export async function POST(request) {
     requireSameOrigin(request);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Please sign in before submitting your request." }, { status: 401 });
     const payload = validateScentRequest(await request.json());
     // Retrying the same submission after a lost response must not create duplicates.
-    const { data: existing, error: existingError } = await supabase.from("custom_perfume_requests").select("id").eq("id", payload.id).eq("auth_user_id", user.id).maybeSingle();
-    if (existingError) throw existingError;
-    if (existing) return NextResponse.json({ request: existing }, { headers: scentHeaders });
-    const { data, error } = await supabase.from("custom_perfume_requests").insert(payload).select("id").single();
+    const { error } = await supabase.from("custom_perfume_requests").insert(payload);
     if (error?.code === "P0001") return NextResponse.json({ error: "Custom perfume requests are currently paused." }, { status: 409 });
     if (error?.code === "23505") {
-      const retry = await supabase.from("custom_perfume_requests").select("id").eq("id", payload.id).eq("auth_user_id", user.id).maybeSingle();
-      if (retry.data) return NextResponse.json({ request: retry.data }, { headers: scentHeaders });
+      if (user) {
+        const retry = await supabase.from("custom_perfume_requests").select("id").eq("id", payload.id).eq("auth_user_id", user.id).maybeSingle();
+        if (retry.data) return NextResponse.json({ request: retry.data }, { headers: scentHeaders });
+      } else {
+        return NextResponse.json({ request: { id: payload.id } }, { headers: scentHeaders });
+      }
     }
     if (error) throw error;
-    return NextResponse.json({ request: data }, { status: 201, headers: scentHeaders });
+    return NextResponse.json({ request: { id: payload.id } }, { status: 201, headers: scentHeaders });
   } catch (error) { return scentError(error); }
 }

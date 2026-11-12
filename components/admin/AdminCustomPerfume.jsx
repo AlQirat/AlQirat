@@ -24,17 +24,15 @@ function RequestEditor({ request, onSaved, onClose }) {
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
-  return <CatalogDialog title={request.reference_name} subtitle={`Request from ${request.contact_name}`} onClose={onClose}>
+  return <CatalogDialog title={request.reference_name} subtitle={`${request.auth_user_id ? "Account customer" : "Guest request"} / ${request.contact_email}`} onClose={onClose}>
     <div className="p-5 sm:p-7">
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         {[
-          ["Reference brand", request.reference_brand], ["Bottle size", `${request.bottle_size} ml`],
-          ["Budget", money(request.budget)], ["Submitted", new Date(request.created_at).toLocaleString("en-IN")],
-          ["Contact", request.contact_name], ["Email", request.contact_email], ["Phone", request.contact_phone],
-          ["Fragrance notes", request.fragrance_notes], ["Preferences", request.scent_preferences], ["Instructions", request.instructions || "None"],
+          ["Brand", request.reference_brand], ["Model / fragrance name", request.reference_name],
+          ["Email", request.contact_email], ["Phone", request.contact_phone],
+          ["Submitted", new Date(request.created_at).toLocaleString("en-IN")],
         ].map(([label, value]) => <div key={label}><dt className="font-semibold text-stone-500">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{value}</dd></div>)}
       </dl>
-      {request.reference_url && <a href={request.reference_url} target="_blank" rel="noopener noreferrer" className="mt-4 block break-all text-sm text-gold-dark underline">Open customer reference</a>}
       {request.custom_order && <p className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Linked order <strong>{request.custom_order.order_number}</strong> · {request.custom_order.status}</p>}
       <form onSubmit={save} className="mt-6 space-y-5 border-t pt-6">
         <fieldset disabled={busy} className="grid gap-5 sm:grid-cols-2">
@@ -103,7 +101,7 @@ export default function AdminCustomPerfume() {
       {!requests.data && !requests.error && <p role="status" className="mt-6">Loading requests…</p>}
       {requests.data?.requests.length === 0 && <p className="mt-6 text-stone-500">No requests match this filter.</p>}
       <div className="mt-6 space-y-3">{requests.data?.requests.map((request) => <article key={request.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4">
-        <div className="min-w-0"><h3 className="break-words font-semibold">{request.reference_brand} — {request.reference_name}</h3><p className="mt-1 break-words text-sm text-stone-500">{request.contact_name} · {request.bottle_size} ml · {money(request.budget)}</p><p className="mt-1 text-xs text-stone-500">{new Date(request.created_at).toLocaleDateString("en-IN")}</p></div>
+        <div className="min-w-0"><h3 className="break-words font-semibold">{request.reference_brand} / {request.reference_name}</h3><p className="mt-1 break-words text-sm text-stone-500">{request.auth_user_id ? "Account customer" : "Guest"} / {request.contact_email} / {request.contact_phone}</p><p className="mt-1 text-xs text-stone-500">{new Date(request.created_at).toLocaleDateString("en-IN")}</p></div>
         <div className="flex flex-wrap items-center gap-3"><span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold">{SCENT_STATUSES[request.status]}</span><button onClick={() => setSelected(request)} className="rounded-full border px-4 py-2 text-center text-sm font-semibold">Manage Request</button></div>
       </article>)}</div>
       {requests.data && <nav aria-label="Request pagination" className="mt-6 flex items-center justify-center gap-4"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-full border px-4 py-2 disabled:opacity-40">Previous</button><span className="text-sm">Page {page} of {Math.max(1, Math.ceil(requests.data.count / 20))}</span><button disabled={page * 20 >= requests.data.count} onClick={() => setPage((value) => value + 1)} className="rounded-full border px-4 py-2 disabled:opacity-40">Next</button></nav>}

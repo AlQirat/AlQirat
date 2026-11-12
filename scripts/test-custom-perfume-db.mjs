@@ -8,14 +8,18 @@ nextEnv.loadEnvConfig(process.cwd(), false, { info() {}, error() {} });
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL || process.env.Direct_connection_str, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10000 });
 const owner = randomUUID();
 const other = randomUUID();
+const guestRequestId = randomUUID();
 const requestId = randomUUID();
 const addressId = randomUUID();
 let passed = 0;
 let step = "connect";
 
 async function identity(role, id) {
+  step = `reset role for ${role}`;
   await client.query("reset role");
+  step = `set claims for ${role}`;
   await client.query("select set_config('request.jwt.claim.sub', $1, true)", [id]);
+  step = `set role ${role}`;
   await client.query(`set local role ${role}`);
 }
 async function denied(operation, code) {
@@ -27,17 +31,28 @@ async function denied(operation, code) {
   passed++;
 }
 const insert = (id) => client.query(`insert into public.custom_perfume_requests
-  (id, reference_brand, reference_name, fragrance_notes, scent_preferences, bottle_size, budget, contact_name, contact_email, contact_phone, profile_acknowledged)
-  values ($1, 'Test brand', 'Test scent', 'Rose and amber', 'Soft and warm', 50, 1500, 'Test Customer', 'test@example.com', '0000000000', true)`, [id]);
+  (id, reference_brand, reference_name, contact_email, contact_phone)
+  values ($1, 'Test brand', 'Test scent', 'test@example.com', '0000000000')`, [id]);
 
 try {
+  step = "connect";
   await client.connect();
+  step = "begin transaction";
   await client.query("begin");
+  step = "set statement timeout";
   await client.query("set local statement_timeout = '10s'");
+  step = "create temporary auth users";
   await client.query("insert into auth.users (id,email,raw_user_meta_data) values ($1,$2,'{}'),($3,$4,'{}')", [owner, `scent-${owner}@example.com`, other, `scent-${other}@example.com`]);
+  step = "enable scent requests";
   await client.query("update public.custom_perfume_settings set enabled = true where id = true");
+  step = "test guest insert";
   await identity("anon", "");
-  await denied(() => insert(randomUUID()), "42501");
+  await insert(guestRequestId); passed++;
+  const guest = (await client.query("select auth_user_id,contact_name,bottle_size,status from public.custom_perfume_requests where id=$1", [guestRequestId])).rows[0];
+  assert.equal(guest.auth_user_id, null);
+  assert.equal(guest.contact_name, "Guest");
+  assert.equal(guest.bottle_size, 50);
+  assert.equal(guest.status, "new");
   await denied(() => client.query("select * from public.custom_perfume_requests"), "42501");
   assert.equal((await client.query("select enabled from public.custom_perfume_settings")).rows[0].enabled, true); passed++;
   await identity("authenticated", owner);
@@ -83,6 +98,8 @@ try {
   await identity("service_role", "");
   step = "disable new custom perfume requests";
   await client.query("update public.custom_perfume_settings set enabled = false, homepage_enabled = false where id = true");
+  await identity("anon", "");
+  await denied(() => insert(randomUUID()), "P0001");
   await identity("authenticated", owner);
   await denied(() => insert(randomUUID()), "P0001");
   assert.equal((await client.query("select id from public.custom_perfume_requests where id=$1", [requestId])).rowCount, 1); passed++;

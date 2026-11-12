@@ -29,6 +29,8 @@ const defaultMigrations = [
   "20261029_combo_hero_slide.sql",
   "20261029_combo_offers.sql",
   "20261029_combo_offer_any_quantity.sql",
+  "20261112_custom_perfume_guest_requests.sql",
+  "20261112_product_fragrance_notes.sql",
 ];
 
 function loadEnv() {

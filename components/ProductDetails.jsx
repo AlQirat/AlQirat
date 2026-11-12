@@ -21,6 +21,8 @@ import { useCart } from "./CartProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
 import ProductGallery from "./ProductGallery";
 import ProductReviews from "./ProductReviews";
+import PriceDisplay from "./PriceDisplay";
+import FragranceNotes from "./FragranceNotes";
 
 function Stars({ value, size }) {
   return (
@@ -66,6 +68,7 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
   const variants = product.variants || [];
   const hasVariants = variants.length > 0;
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+  const displayCompareAtPrice = selectedVariant?.compare_at_price ?? (hasVariants ? variants[0]?.compare_at_price : product.compareAtPrice);
 
   const addToCart = () => {
     const item = hasVariants && selectedVariant ? { ...product, price: selectedVariant.price, variant: selectedVariant } : product;
@@ -130,6 +133,8 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                 {getDescription(product)}
               </p>
 
+              <FragranceNotes notes={product.fragranceNotes} />
+
               {hasVariants && (
                 <div className="mt-6">
                   <p className="text-sm font-semibold text-ink">Select Size</p>
@@ -147,6 +152,7 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                         aria-pressed={selectedVariant?.size === variant.size}
                       >
                         {variant.size}
+                        {Number(variant.compare_at_price) > Number(variant.price) && <span className="text-xs text-stone-400 line-through">MRP ₹{variant.compare_at_price}</span>}
                         <span className="text-gold-dark">₹{variant.price}</span>
                         {variant.stock !== undefined && (
                           <span className="text-xs text-stone-500">({variant.stock} in stock)</span>
@@ -160,10 +166,7 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                 </div>
               )}
 
-              <p className="mt-7 text-4xl font-bold">
-                <span className="mr-1 text-2xl font-semibold text-gold-dark">₹</span>
-                {displayPrice}
-              </p>
+              <PriceDisplay price={displayPrice} compareAtPrice={displayCompareAtPrice} showMrpAfterPrice className="mt-7" priceClassName="text-4xl font-bold" mrpClassName="text-lg font-medium text-stone-400" />
               <p className="mt-1 text-sm text-stone-500">Inclusive of all taxes</p>
 
               <div className="mt-7 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)]">
@@ -250,8 +253,8 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                       src={similarProduct.src}
                       alt={similarProduct.name}
                       tone={similarProduct.tone}
-                      className="aspect-square w-full sm:h-[250px] sm:aspect-auto"
-                      imgClassName="h-full w-full object-contain transition duration-700 group-hover:scale-105"
+                      className="w-full"
+                      imgClassName="block h-auto w-full object-contain transition duration-700 group-hover:brightness-105"
                     />
                   </a>
                   <div className="p-3 sm:p-5">
@@ -269,10 +272,7 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                         <span className="text-xs text-stone-500">({similarProduct.reviews})</span>
                       </div>
                     )}
-                    <p className="mt-3 text-xl font-bold sm:text-2xl">
-                      <span className="mr-0.5 text-lg text-gold-dark">₹</span>
-                      {similarProduct.price}
-                    </p>
+                    <PriceDisplay price={similarProduct.price} compareAtPrice={similarProduct.compareAtPrice} className="mt-3" priceClassName="text-xl font-bold sm:text-2xl" mrpClassName="text-[10px] font-medium text-stone-400 sm:text-xs" />
                   </div>
                 </article>
               </Reveal>

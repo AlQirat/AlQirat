@@ -6,6 +6,7 @@ import SmartImage from "./SmartImage";
 import { useCart } from "./CartProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useStorefrontContent } from "./useStorefrontData";
+import PriceDisplay from "./PriceDisplay";
 
 const fieldClass = "mt-2 h-12 w-full rounded-xl border border-stone-200 bg-white px-4 outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/15";
 const razorpayScriptUrl = "https://checkout.razorpay.com/v1/checkout.js";
@@ -218,7 +219,7 @@ export default function CustomerCheckout({ user, customer, address }) {
                   <SmartImage src={item.src} alt={item.name} className="h-20 w-20 shrink-0 rounded-xl" imgClassName="h-full w-full object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{item.name}</p>
-                    <p className="mt-1 text-sm text-gold-dark">₹{item.price}</p>
+                    <PriceDisplay price={item.price} compareAtPrice={item.compareAtPrice} className="mt-1" priceClassName="text-sm text-gold-dark" mrpClassName="text-[10px] font-medium text-stone-400" />
                     <div className="mt-2 flex items-center gap-2">
                       <button type="button" onClick={() => updateQuantity(item.slug, item.quantity - 1)} className="rounded-full border p-1"><Minus size={13} /></button>
                       <span className="w-5 text-center text-sm">{item.quantity}</span>

@@ -6,18 +6,26 @@ import { uploadImage } from "@/lib/uploadImage";
 import SmartImage from "@/components/SmartImage";
 import CatalogDialog from "./CatalogDialog";
 import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
+import { fragranceNotesToText, normalizeFragranceNotes, parseFragranceNoteText } from "@/lib/fragranceNotes";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-gold focus:ring-4 focus:ring-gold/10";
 
 function normalizeVariants(variants) {
   return Array.isArray(variants)
-    ? variants.map((variant) => ({
-        size: String(variant?.size || ""),
-        price: variant?.price ?? "",
-        stock: variant?.stock ?? "",
-      }))
+      ? variants.map((variant) => ({
+          size: String(variant?.size || ""),
+          price: variant?.price ?? "",
+          compare_at_price: variant?.compare_at_price ?? "",
+          stock: variant?.stock ?? "",
+        }))
     : [];
 }
+
+const fragranceNoteGroups = [
+  { key: "top", label: "Top Notes", placeholder: "Bergamot, saffron, citrus" },
+  { key: "heart", label: "Heart Notes", placeholder: "Rose, jasmine, amber" },
+  { key: "base", label: "Base Notes", placeholder: "Vanilla, musk, sandalwood" },
+];
 
 function ProductForm({ product, categories, onSaved, onCancel }) {
   const [categoryId, setCategoryId] = useState(product?.category_id || categories[0]?.id || "");
@@ -27,6 +35,7 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [imageUrls, setImageUrls] = useState(() => [...new Set([product?.image_url, ...(product?.gallery_urls || [])].filter(Boolean))]);
   const [variants, setVariants] = useState(() => normalizeVariants(product?.variants));
+  const [fragranceNotes, setFragranceNotes] = useState(() => fragranceNotesToText(product?.fragrance_notes));
   const category = categories.find((item) => item.id === categoryId);
   
   async function save(event) {
@@ -43,6 +52,7 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
         .map((variant) => ({
           size: variant.size.trim(),
           price: Number(variant.price),
+          ...(variant.compare_at_price === "" ? {} : { compare_at_price: Number(variant.compare_at_price) }),
           ...(variant.stock === "" ? {} : { stock: Number(variant.stock) }),
         }))
         .filter((variant) => variant.size || Number.isFinite(variant.price) || variant.stock !== undefined);
@@ -65,16 +75,34 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
         setSaving(false);
         return;
       }
+      if (variant.compare_at_price !== undefined && (!Number.isFinite(variant.compare_at_price) || variant.compare_at_price < variant.price)) {
+        setError(`Enter an MRP greater than or equal to the selling price for ${variant.size}.`);
+        setSaving(false);
+        return;
+      }
       if (variant.stock !== undefined && (!Number.isInteger(variant.stock) || variant.stock < 0)) {
         setError(`Enter a valid stock quantity for ${variant.size}.`);
         setSaving(false);
         return;
       }
     }
+    let normalizedFragranceNotes;
+    try {
+      normalizedFragranceNotes = normalizeFragranceNotes({
+        top: parseFragranceNoteText(fragranceNotes.top),
+        heart: parseFragranceNoteText(fragranceNotes.heart),
+        base: parseFragranceNoteText(fragranceNotes.base),
+      });
+    } catch (noteError) {
+      setError(noteError.message);
+      setSaving(false);
+      return;
+    }
     const payload = {
       name: form.get("name"), category_id: categoryId, subcategory_id: form.get("subcategory_id") || null,
       short_description: form.get("short_description"), description: form.get("description"),
-      price: normalizedVariants[0]?.price ?? form.get("price"), stock_quantity: form.get("stock_quantity"), image_url: imageUrls[0], gallery_urls: imageUrls.slice(1), variants: normalizedVariants,
+      price: normalizedVariants[0]?.price ?? form.get("price"), compare_at_price: normalizedVariants[0]?.compare_at_price ?? form.get("compare_at_price"), stock_quantity: form.get("stock_quantity"), image_url: imageUrls[0], gallery_urls: imageUrls.slice(1), variants: normalizedVariants,
+      fragrance_notes: normalizedFragranceNotes,
       badge: form.get("badge"), is_active: form.get("is_active") === "on", is_featured: form.get("is_featured") === "on",
     };
     const url = product ? `/api/admin/catalog/products/${product.id}` : "/api/admin/catalog/products";
@@ -136,23 +164,45 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
       </div>
       <label className="text-sm font-semibold">Category<select name="category_id" required value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className={inputClass}>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <label className="text-sm font-semibold">Subcategory<select name="subcategory_id" defaultValue={product?.subcategory_id || ""} className={inputClass}><option value="">No subcategory</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="text-sm font-semibold">Price (₹)<input name="price" type="number" min="0" step="0.01" required defaultValue={product?.price || ""} className={inputClass} /></label>
+      <label className="text-sm font-semibold">Selling price (₹)<input name="price" type="number" min="0" step="0.01" required defaultValue={product?.price || ""} className={inputClass} /></label>
+      <label className="text-sm font-semibold">MRP (₹)<input name="compare_at_price" type="number" min="0" step="0.01" defaultValue={product?.compare_at_price ?? ""} className={inputClass} placeholder="Optional" /></label>
       <label className="text-sm font-semibold">Stock quantity<input name="stock_quantity" type="number" min="0" step="1" required defaultValue={product?.stock_quantity ?? 0} className={inputClass} /></label>
       <div className="rounded-2xl border border-gold/25 bg-cream/50 p-4 sm:col-span-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-sm font-semibold">Size-wise pricing</p><p className="mt-1 text-xs leading-relaxed text-stone-500">Optional. Add options such as 50ml ₹2,499 and 100ml ₹3,999. The first option becomes the product’s listing price.</p></div>
           <button type="button" onClick={() => setVariants((current) => [...current, { size: "", price: "", stock: "" }])} className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-white px-3 py-2 text-xs font-semibold text-gold-dark hover:bg-cream"><Plus size={15} /> Add size</button>
         </div>
-        {variants.length > 0 ? <div className="mt-4 grid gap-3">{variants.map((variant, index) => <div key={index} className="grid gap-3 rounded-xl border border-stone-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-          <label className="text-xs font-semibold text-stone-700">Size<input value={variant.size} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item))} placeholder="50ml" className={inputClass} /></label>
-          <label className="text-xs font-semibold text-stone-700">Price (₹)<input value={variant.price} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, price: event.target.value } : item))} type="number" min="0" step="0.01" placeholder="2499" className={inputClass} /></label>
-          <label className="text-xs font-semibold text-stone-700">Stock (optional)<input value={variant.stock} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, stock: event.target.value } : item))} type="number" min="0" step="1" placeholder="100" className={inputClass} /></label>
+        {variants.length > 0 ? <div className="mt-4 grid gap-3">{variants.map((variant, index) => <div key={index} className="grid gap-3 rounded-xl border border-stone-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+           <label className="text-xs font-semibold text-stone-700">Size<input value={variant.size} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item))} placeholder="50ml" className={inputClass} /></label>
+           <label className="text-xs font-semibold text-stone-700">Selling price (₹)<input value={variant.price} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, price: event.target.value } : item))} type="number" min="0" step="0.01" placeholder="2499" className={inputClass} /></label>
+           <label className="text-xs font-semibold text-stone-700">MRP (₹)<input value={variant.compare_at_price} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, compare_at_price: event.target.value } : item))} type="number" min="0" step="0.01" placeholder="2999" className={inputClass} /></label>
+           <label className="text-xs font-semibold text-stone-700">Stock (optional)<input value={variant.stock} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, stock: event.target.value } : item))} type="number" min="0" step="1" placeholder="100" className={inputClass} /></label>
           <button type="button" onClick={() => setVariants((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove size option ${index + 1}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 text-red-600 hover:bg-red-50"><X size={17} /></button>
         </div>)}</div> : <p className="mt-4 rounded-xl border border-dashed border-stone-300 bg-white px-3 py-4 text-center text-sm text-stone-500">No size options added yet.</p>}
       </div>
       <label className="text-sm font-semibold">Short description<input name="short_description" required defaultValue={product?.short_description || ""} className={inputClass} /></label>
       <label className="text-sm font-semibold">Badge<input name="badge" defaultValue={product?.badge || ""} className={inputClass} placeholder="Optional" /></label>
       <label className="text-sm font-semibold sm:col-span-2">Full description<textarea name="description" defaultValue={product?.description || ""} rows={4} className="mt-2 w-full rounded-xl border border-stone-200 p-3 text-sm outline-none focus:border-gold focus:ring-4 focus:ring-gold/10" /></label>
+      <div className="rounded-2xl border border-gold/25 bg-cream/50 p-4 sm:col-span-2">
+        <div>
+          <p className="text-sm font-semibold">Fragrance notes</p>
+          <p className="mt-1 text-xs leading-relaxed text-stone-500">Add notes for each stage of the fragrance, separated by commas. These appear as categorized cards on the product page.</p>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {fragranceNoteGroups.map((group) => (
+            <label key={group.key} className="text-xs font-semibold text-stone-700">
+              {group.label}
+              <textarea
+                value={fragranceNotes[group.key]}
+                onChange={(event) => setFragranceNotes((current) => ({ ...current, [group.key]: event.target.value }))}
+                rows={3}
+                placeholder={group.placeholder}
+                className="mt-2 min-h-[84px] w-full resize-y rounded-xl border border-stone-200 bg-white p-3 text-sm font-normal outline-none transition focus:border-gold focus:ring-4 focus:ring-gold/10"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap gap-5 sm:col-span-2">
         <label className="flex items-center gap-3 text-sm font-semibold"><input name="is_active" type="checkbox" defaultChecked={product?.is_active ?? true} className="h-4 w-4 accent-[#C99A4B]" /> Product is active</label>
         <label className="flex items-center gap-3 text-sm font-semibold"><input name="is_featured" type="checkbox" defaultChecked={product?.is_featured ?? false} className="h-4 w-4 accent-[#C99A4B]" /> Featured on homepage</label>
@@ -210,8 +260,8 @@ export default function AdminProducts() {
       </div>
       {error && <p role="alert" className="m-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7">{error}</p>}
       <div className="flex flex-col gap-3 border-b border-stone-200 p-5 sm:flex-row sm:px-7"><label className="flex h-11 w-full min-w-0 items-center gap-3 rounded-xl border px-3 focus-within:border-gold sm:flex-1"><Search size={17} className="shrink-0 text-stone-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" className="w-full min-w-0 flex-1 bg-transparent text-sm outline-none" /></label><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-11 w-full shrink-0 rounded-xl border bg-white px-3 text-sm sm:w-auto sm:min-w-[160px]"><option value="All">All categories</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-      {loading ? <p className="p-8 text-sm text-stone-500">Loading products...</p> : (
-        <div className="max-h-[650px] overflow-auto"><table className="w-full min-w-[920px] text-left"><thead className="sticky top-0 z-10 bg-stone-50 text-[11px] uppercase tracking-[0.14em] text-stone-500"><tr><th className="px-7 py-3">Product</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Status</th><th className="px-7 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-stone-100">{filteredProducts.map((product) => <tr key={product.id} className="text-sm hover:bg-cream/60"><td className="px-7 py-3"><div className="flex items-center gap-3"><SmartImage src={product.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg" imgClassName="h-full w-full object-cover" /><div><p className="font-semibold">{product.name}</p><p className="mt-0.5 text-xs text-stone-400">{product.subcategories?.name || "No subcategory"}</p></div></div></td><td className="px-5 py-3 text-stone-600">{product.categories?.name}</td><td className="px-5 py-3 font-semibold">₹{product.price}</td><td className="px-5 py-3">{product.stock_quantity}</td><td className="px-5 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.is_active ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-500"}`}>{product.is_active ? "Active" : "Inactive"}</span></td><td className="px-7 py-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => setSelected(product)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold hover:border-gold hover:bg-cream"><Eye size={14} /> View & Edit</button><button onClick={() => deleteProduct(product)} aria-label={`Delete ${product.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>
+       {loading ? <p className="p-8 text-sm text-stone-500">Loading products...</p> : (
+         <div className="max-h-[650px] overflow-auto"><table className="w-full min-w-[920px] text-left"><thead className="sticky top-0 z-10 bg-stone-50 text-[11px] uppercase tracking-[0.14em] text-stone-500"><tr><th className="px-7 py-3">Product</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Status</th><th className="px-7 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-stone-100">{filteredProducts.map((product) => <tr key={product.id} className="text-sm hover:bg-cream/60"><td className="px-7 py-3"><div className="flex items-center gap-3"><SmartImage src={product.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg" imgClassName="h-full w-full object-cover" /><div><p className="font-semibold">{product.name}</p><p className="mt-0.5 text-xs text-stone-400">{product.subcategories?.name || "No subcategory"}</p></div></div></td><td className="px-5 py-3 text-stone-600">{product.categories?.name}</td><td className="px-5 py-3"><div className="flex flex-wrap items-baseline gap-2">{Number(product.compare_at_price) > Number(product.price) && <span className="text-xs text-stone-400 line-through">MRP ₹{product.compare_at_price}</span>}<span className="font-semibold">₹{product.price}</span></div></td><td className="px-5 py-3">{product.stock_quantity}</td><td className="px-5 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.is_active ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-500"}`}>{product.is_active ? "Active" : "Inactive"}</span></td><td className="px-7 py-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => setSelected(product)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold hover:border-gold hover:bg-cream"><Eye size={14} /> View & Edit</button><button onClick={() => deleteProduct(product)} aria-label={`Delete ${product.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>
       )}
       {(selected || creating) && <CatalogDialog title={creating ? "Add new product" : selected.name} subtitle={creating ? "Create a new item in the Al Qirat Perfumes catalog." : "View and update this product."} onClose={() => { setSelected(null); setCreating(false); }}><ProductForm product={creating ? null : selected} categories={categories} onCancel={() => { setSelected(null); setCreating(false); }} onSaved={async () => { setSelected(null); setCreating(false); await loadCatalog(); }} /></CatalogDialog>}
     </section>

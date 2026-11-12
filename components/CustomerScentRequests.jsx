@@ -62,7 +62,7 @@ function CustomOrderForm({ request, user, customer, address }) {
     <h4 className="font-semibold">Accept quotation and place your order</h4>
     <p className="mt-1 text-sm leading-6 text-stone-600">This creates a normal COD order linked to your fragrance request. Payment is collected on delivery.</p>
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-      <label className="text-sm font-semibold">Recipient name<input name="recipient_name" required minLength={2} defaultValue={address?.recipient_name || customer?.full_name || request.contact_name} className={fieldClass} /></label>
+      <label className="text-sm font-semibold">Recipient name<input name="recipient_name" required minLength={2} defaultValue={address?.recipient_name || customer?.full_name || request.contact_email.split("@")[0]} className={fieldClass} /></label>
       <label className="text-sm font-semibold">Phone<input name="phone" required pattern="[0-9+() \-]{7,20}" defaultValue={address?.phone || customer?.phone || request.contact_phone} className={fieldClass} /></label>
       <label className="text-sm font-semibold sm:col-span-2">Address line 1<input name="address_line_1" required minLength={5} defaultValue={address?.address_line_1 || ""} className={fieldClass} /></label>
       <label className="text-sm font-semibold sm:col-span-2">Address line 2 <span className="font-normal text-stone-500">(optional)</span><input name="address_line_2" defaultValue={address?.address_line_2 || ""} className={fieldClass} /></label>
@@ -100,7 +100,7 @@ export default function CustomerScentRequests({ user, customer, address }) {
       <div className="mt-5 space-y-5">{data?.requests.map((request) => (
         <article key={request.id} className="rounded-2xl border border-stone-200 bg-cream/40 p-5">
           <div className="flex flex-wrap justify-between gap-3">
-            <div><h3 className="font-semibold">{request.reference_brand} — {request.reference_name}</h3><p className="mt-1 text-sm text-stone-500">{request.bottle_size} ml · Budget {money(request.budget)}</p></div>
+            <div><h3 className="font-semibold">{request.reference_brand} — {request.reference_name}</h3><p className="mt-1 text-sm text-stone-500">{request.contact_email} · {request.contact_phone}</p></div>
             <span className="h-fit rounded-full bg-gold/15 px-3 py-1 text-sm font-semibold text-gold-dark">{SCENT_STATUSES[request.status]}</span>
           </div>
           <p className="mt-3 break-all text-xs text-stone-500">Reference: {request.id}</p>
@@ -109,7 +109,7 @@ export default function CustomerScentRequests({ user, customer, address }) {
           {request.quotation_amount !== null && request.status !== "quoted" && !request.custom_order && <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Your quotation has been added and is awaiting publication. The delivery form and acceptance button will appear after the request status is updated to <strong>Quotation ready</strong>.</p>}
           {request.status === "quoted" && !request.custom_order && <CustomOrderForm request={request} user={user} customer={customer} address={address} />}
           <details className="mt-4 text-sm"><summary className="cursor-pointer font-semibold text-forest">Request details & updates</summary>
-            <dl className="mt-3 grid gap-3"><div><dt className="font-semibold">Fragrance notes</dt><dd className="whitespace-pre-wrap break-words">{request.fragrance_notes}</dd></div><div><dt className="font-semibold">Preferences</dt><dd className="whitespace-pre-wrap break-words">{request.scent_preferences}</dd></div><div><dt className="font-semibold">Instructions</dt><dd className="whitespace-pre-wrap break-words">{request.instructions || "None"}</dd></div></dl>
+            <dl className="mt-3 grid gap-3"><div><dt className="font-semibold">Brand</dt><dd className="whitespace-pre-wrap break-words">{request.reference_brand}</dd></div><div><dt className="font-semibold">Model / fragrance name</dt><dd className="whitespace-pre-wrap break-words">{request.reference_name}</dd></div><div><dt className="font-semibold">Email</dt><dd className="whitespace-pre-wrap break-words">{request.contact_email}</dd></div><div><dt className="font-semibold">Phone</dt><dd className="whitespace-pre-wrap break-words">{request.contact_phone}</dd></div></dl>
             <ol className="mt-4 space-y-3 border-t pt-4">{[...request.custom_perfume_updates].sort((a, b) => b.created_at.localeCompare(a.created_at)).map((update) => <li key={update.id}><p className="font-semibold">{SCENT_STATUSES[update.status]}{update.quotation_amount !== null ? ` · ${money(update.quotation_amount)}` : ""}</p><time className="text-xs text-stone-500">{new Date(update.created_at).toLocaleString("en-IN")}</time>{update.quotation_details && <p className="whitespace-pre-wrap break-words">{update.quotation_details}</p>}</li>)}</ol>
           </details>
         </article>
