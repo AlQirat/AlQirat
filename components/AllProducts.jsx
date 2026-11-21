@@ -15,13 +15,52 @@ function categorySlug(value) {
   return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function getInitialFilterState(products, initialCategory, queryString = "") {
+function buildCategoryOptions(catalogCategories = [], products = []) {
+  const byKey = new Map();
+
+  catalogCategories.forEach((category) => {
+    const name = String(category?.name || "").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        name,
+        slug: String(category?.slug || "").trim() || categorySlug(name),
+      });
+    }
+  });
+
+  products.forEach((product) => {
+    const name = String(product?.category || "Uncategorized").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        name,
+        slug: categorySlug(name),
+      });
+    }
+  });
+
+  return [...byKey.values()];
+}
+
+function findCategoryNameBySlug(categoryOptions, slug) {
+  const normalized = String(slug || "").trim().toLowerCase();
+  if (!normalized) return null;
+  const match = categoryOptions.find(
+    (category) => category.slug.toLowerCase() === normalized || categorySlug(category.name) === normalized,
+  );
+  return match?.name || null;
+}
+
+function getInitialFilterState(categoryOptions, initialCategory, queryString = "") {
   const searchParams = new URLSearchParams(queryString);
   const categorySlugs = searchParams.getAll("category");
   const categoryNames = categorySlugs
-    .map((slug) => products.find((product) => categorySlug(product.category) === slug)?.category)
+    .map((slug) => findCategoryNameBySlug(categoryOptions, slug))
     .filter(Boolean);
-  const fallbackCategory = products.find((product) => categorySlug(product.category) === initialCategory)?.category;
+  const fallbackCategory = findCategoryNameBySlug(categoryOptions, initialCategory);
   const maximumPriceValue = searchParams.get("maxPrice");
   const maximumPrice = maximumPriceValue === null ? null : Number(maximumPriceValue);
   const requestedSort = searchParams.get("sort");
@@ -37,19 +76,35 @@ function getInitialFilterState(products, initialCategory, queryString = "") {
   };
 }
 
+const INITIAL_VISIBLE_CATEGORIES = 5;
+
 function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalogPrice, selectedCategories, maximumPrice, onCategoryToggle, onClearCategories, onMaximumPriceChange, onReset }) {
   const hasActiveFilters = selectedCategories.size > 0 || maximumPrice < maximumCatalogPrice;
+  const [categoriesOpen, setCategoriesOpen] = useState(true);
+  const [priceOpen, setPriceOpen] = useState(true);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
+  const hasHiddenSelectedCategory = categories
+    .slice(INITIAL_VISIBLE_CATEGORIES)
+    .some((category) => selectedCategories.has(category));
+
+  useEffect(() => {
+    if (hasHiddenSelectedCategory) setShowAllCategories(true);
+  }, [hasHiddenSelectedCategory]);
+
+  const hiddenCategoryCount = Math.max(0, categories.length - INITIAL_VISIBLE_CATEGORIES);
+  const visibleCategories = showAllCategories ? categories : categories.slice(0, INITIAL_VISIBLE_CATEGORIES);
 
   return (
     <div className="overflow-hidden rounded-3xl border border-gold/25 bg-white/95 shadow-[0_22px_50px_-30px_rgba(21,16,12,0.45)] backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b border-stone-200 px-6 py-5">
+      <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
-            <Filter size={18} />
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
+            <Filter size={17} />
           </span>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-gold-dark">Refine</p>
-            <h3 className="text-lg font-bold text-ink">Filter Products</h3>
+            <h3 className="text-base font-bold text-ink">Filter Products</h3>
           </div>
         </div>
         {hasActiveFilters && (
@@ -59,61 +114,107 @@ function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalog
         )}
       </div>
 
-      <div className="px-6 py-5">
-        <h4 className="font-serif text-xl font-semibold text-ink">Categories</h4>
-        <div className="mt-4 space-y-1">
-          <label className="group flex cursor-pointer items-center justify-between rounded-xl px-2 py-2.5 transition hover:bg-cream">
-            <span className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={selectedCategories.size === 0}
-                onChange={onClearCategories}
-                className="h-4 w-4 rounded border-stone-300 accent-[#C99A4B]"
-              />
-              <span className="text-sm font-medium text-stone-700 group-hover:text-ink">All Products</span>
-            </span>
-            <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-stone-500">{products.length}</span>
-          </label>
+      <div className="px-5 py-4">
+        <button
+          type="button"
+          onClick={() => setCategoriesOpen((open) => !open)}
+          aria-expanded={categoriesOpen}
+          className="flex w-full items-center justify-between gap-2 text-left"
+        >
+          <h4 className="font-serif text-lg font-semibold text-ink">Categories</h4>
+          <ChevronDown
+            size={18}
+            className={`text-stone-500 transition-transform duration-200 ${categoriesOpen ? "rotate-180" : ""}`}
+          />
+        </button>
 
-          {categories.map((category) => {
-            const count = products.filter((product) => product.category === category).length;
-            return (
-              <label key={category} className="group flex cursor-pointer items-center justify-between rounded-xl px-2 py-2.5 transition hover:bg-cream">
-                <span className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.has(category)}
-                    onChange={() => onCategoryToggle(category)}
-                    className="h-4 w-4 rounded border-stone-300 accent-[#C99A4B]"
-                  />
-                  <span className="text-sm font-medium text-stone-700 group-hover:text-ink">{category}</span>
-                </span>
-                <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-stone-500">{count}</span>
-              </label>
-            );
-          })}
-        </div>
+        {categoriesOpen && (
+          <div className="mt-3 space-y-0.5">
+            <label className="group flex cursor-pointer items-center justify-between rounded-xl px-2 py-2 transition hover:bg-cream">
+              <span className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.size === 0}
+                  onChange={onClearCategories}
+                  className="h-4 w-4 rounded border-stone-300 accent-[#C99A4B]"
+                />
+                <span className="text-sm font-medium text-stone-700 group-hover:text-ink">All Products</span>
+              </span>
+              <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-stone-500">{products.length}</span>
+            </label>
+
+            {visibleCategories.map((category) => {
+              const count = products.filter(
+                (product) => String(product.category || "Uncategorized").trim().toLowerCase() === category.toLowerCase(),
+              ).length;
+              return (
+                <label key={category} className="group flex cursor-pointer items-center justify-between rounded-xl px-2 py-2 transition hover:bg-cream">
+                  <span className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.has(category)}
+                      onChange={() => onCategoryToggle(category)}
+                      className="h-4 w-4 rounded border-stone-300 accent-[#C99A4B]"
+                    />
+                    <span className="text-sm font-medium text-stone-700 group-hover:text-ink">{category}</span>
+                  </span>
+                  <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-stone-500">{count}</span>
+                </label>
+              );
+            })}
+
+            {hiddenCategoryCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllCategories((open) => !open)}
+                className="mt-1 flex w-full items-center justify-between rounded-xl px-2 py-2 text-xs font-semibold text-gold-dark transition hover:bg-cream hover:text-ink"
+              >
+                <span>{showAllCategories ? "Show less" : `Show more (+${hiddenCategoryCount})`}</span>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${showAllCategories ? "rotate-180" : ""}`}
+                />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="border-t border-stone-200 px-6 py-5">
-        <div className="flex items-center justify-between gap-4">
-          <h4 className="font-serif text-xl font-semibold text-ink">Max Price</h4>
-          <span className="rounded-full bg-gold/15 px-3 py-1 text-sm font-bold text-gold-dark">₹{maximumPrice}</span>
-        </div>
-        <input
-          type="range"
-          min={minimumCatalogPrice}
-          max={maximumCatalogPrice}
-          step="50"
-          value={maximumPrice}
-          onChange={(event) => onMaximumPriceChange(Number(event.target.value))}
-          aria-label="Maximum product price"
-          className="mt-5 h-2 w-full cursor-pointer accent-[#C99A4B]"
-        />
-        <div className="mt-2 flex justify-between text-xs font-medium text-stone-500">
-          <span>₹{minimumCatalogPrice}</span>
-          <span>₹{maximumCatalogPrice}</span>
-        </div>
+      <div className="border-t border-stone-200 px-5 py-4">
+        <button
+          type="button"
+          onClick={() => setPriceOpen((open) => !open)}
+          aria-expanded={priceOpen}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <h4 className="font-serif text-lg font-semibold text-ink">Max Price</h4>
+          <span className="flex items-center gap-2">
+            <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-xs font-bold text-gold-dark">₹{maximumPrice}</span>
+            <ChevronDown
+              size={18}
+              className={`text-stone-500 transition-transform duration-200 ${priceOpen ? "rotate-180" : ""}`}
+            />
+          </span>
+        </button>
+
+        {priceOpen && (
+          <>
+            <input
+              type="range"
+              min={minimumCatalogPrice}
+              max={maximumCatalogPrice}
+              step="50"
+              value={maximumPrice}
+              onChange={(event) => onMaximumPriceChange(Number(event.target.value))}
+              aria-label="Maximum product price"
+              className="mt-4 h-2 w-full cursor-pointer accent-[#C99A4B]"
+            />
+            <div className="mt-2 flex justify-between text-xs font-medium text-stone-500">
+              <span>₹{minimumCatalogPrice}</span>
+              <span>₹{maximumCatalogPrice}</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -134,18 +235,15 @@ function Stars({ value }) {
 export default function AllProducts({ initialCategory, initialCatalog }) {
   const { addItem } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  const { products, error: catalogError } = useStorefrontCatalog(initialCatalog);
-  const productsRef = useRef(products);
-  productsRef.current = products;
-  const initialFilterState = getInitialFilterState(products, initialCategory);
-  const categories = useMemo(() => {
-    const categoryNames = new Map();
-    products.forEach((product) => {
-      const category = String(product.category || "Uncategorized").trim();
-      categoryNames.set(category.toLowerCase(), category);
-    });
-    return [...categoryNames.values()];
-  }, [products]);
+  const { products, categories: catalogCategories = [], error: catalogError } = useStorefrontCatalog(initialCatalog);
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(catalogCategories, products),
+    [catalogCategories, products],
+  );
+  const categories = useMemo(() => categoryOptions.map((category) => category.name), [categoryOptions]);
+  const categoryOptionsRef = useRef(categoryOptions);
+  categoryOptionsRef.current = categoryOptions;
+  const initialFilterState = getInitialFilterState(categoryOptions, initialCategory);
   const { minimumCatalogPrice, maximumCatalogPrice } = useMemo(() => {
     const catalogPrices = products.map((product) => product.price);
     return {
@@ -163,7 +261,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
   const maximumPrice = Math.min(maximumPriceOverride ?? maximumCatalogPrice, maximumCatalogPrice);
 
   useEffect(() => {
-    const restoredFilterState = getInitialFilterState(productsRef.current, initialCategory, window.location.search);
+    const restoredFilterState = getInitialFilterState(categoryOptionsRef.current, initialCategory, window.location.search);
     setSelectedCategories(new Set(restoredFilterState.selectedCategories));
     setMaximumPriceOverride(restoredFilterState.maximumPriceOverride);
     setSortBy(restoredFilterState.sortBy);
@@ -173,9 +271,9 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
 
   useEffect(() => {
     if (!initialCategory) return;
-    const matchingCategory = categories.find((category) => categorySlug(category) === initialCategory);
+    const matchingCategory = findCategoryNameBySlug(categoryOptions, initialCategory);
     if (matchingCategory) setSelectedCategories(new Set([matchingCategory]));
-  }, [categories, initialCategory]);
+  }, [categoryOptions, initialCategory]);
 
   const toggle = (setter, name, ms) =>
     setter((prev) => {
@@ -202,10 +300,16 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
     setMaximumPriceOverride(null);
   };
 
+  const selectedCategoryKeys = useMemo(
+    () => new Set([...selectedCategories].map((name) => name.trim().toLowerCase())),
+    [selectedCategories],
+  );
+
   const filteredProducts = useMemo(() => products.filter((product) => {
-    const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(product.category);
+    const productCategoryKey = String(product.category || "Uncategorized").trim().toLowerCase();
+    const matchesCategory = selectedCategoryKeys.size === 0 || selectedCategoryKeys.has(productCategoryKey);
     return matchesCategory && product.price <= maximumPrice;
-  }), [maximumPrice, products, selectedCategories]);
+  }), [maximumPrice, products, selectedCategoryKeys]);
 
   const sortedProducts = useMemo(() => [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
@@ -233,11 +337,14 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
   }, [maximumPriceOverride, productsPerPage, selectedCategories, sortBy]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !products.length) return;
+    if (typeof window === "undefined" || (!products.length && !categoryOptions.length)) return;
 
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("category");
-    [...selectedCategories].forEach((category) => searchParams.append("category", categorySlug(category)));
+    [...selectedCategories].forEach((categoryName) => {
+      const matched = categoryOptions.find((item) => item.name.toLowerCase() === categoryName.toLowerCase());
+      searchParams.append("category", matched?.slug || categorySlug(categoryName));
+    });
 
     if (maximumPriceOverride !== null && maximumPrice < maximumCatalogPrice) searchParams.set("maxPrice", String(maximumPriceOverride));
     else searchParams.delete("maxPrice");
@@ -254,7 +361,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
     const query = searchParams.toString();
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState(window.history.state, "", nextUrl);
-  }, [activePage, maximumCatalogPrice, maximumPrice, maximumPriceOverride, products.length, productsPerPage, selectedCategories, sortBy]);
+  }, [activePage, categoryOptions, maximumCatalogPrice, maximumPrice, maximumPriceOverride, products.length, productsPerPage, selectedCategories, sortBy]);
 
   return (
     <section className="relative isolate overflow-clip bg-cream py-20 lg:py-24">
@@ -346,7 +453,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
         <div className="mt-8 grid items-start gap-7 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
           <aside
             id="mobile-shop-filters"
-            className={`${filtersOpen ? "block" : "hidden"} max-h-[calc(100vh-7rem)] self-start overflow-y-auto rounded-3xl lg:sticky lg:top-24 lg:block`}
+            className={`${filtersOpen ? "block" : "hidden"} self-start rounded-3xl lg:sticky lg:top-24 lg:block`}
             aria-label="Product filters"
           >
             <FilterPanel

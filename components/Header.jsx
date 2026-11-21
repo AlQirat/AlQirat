@@ -53,21 +53,21 @@ function ShopMenu({ item, active }) {
         />
       </a>
 
-      <div className="invisible absolute left-1/2 top-full z-50 w-[360px] -translate-x-1/2 translate-y-2 pt-4 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+      <div className="invisible absolute left-1/2 top-full z-50 w-[320px] max-w-[calc(100vw-2rem)] -translate-x-1/2 translate-y-2 pt-4 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 xl:w-[360px] 2xl:w-[400px]">
         <div className="overflow-hidden rounded-2xl border border-gold/20 bg-white shadow-[0_26px_60px_-24px_rgba(20,40,26,0.5)]">
-          <ul className="max-h-[70vh] overflow-y-auto p-2">
+          <ul className="dropdown-scrollbar max-h-[min(272px,55vh)] overflow-y-auto overscroll-contain p-2 xl:max-h-[min(320px,60vh)] 2xl:max-h-[min(336px,62vh)]">
             {item.children.map((category) => (
               <li key={category.href}>
-                <a href={category.href} className="group/row flex items-center gap-4 rounded-xl p-2.5 transition hover:bg-cream">
+                <a href={category.href} className="group/row flex items-center gap-3.5 rounded-xl p-2 transition hover:bg-cream xl:gap-4 xl:p-2.5 2xl:p-3">
                   <SmartImage
                     src={category.image}
                     alt=""
                     tone="from-sage to-cream"
                     imageKitTransform="f-auto,q-75,w-160"
-                    className="h-14 w-14 shrink-0 rounded-xl"
+                    className="h-12 w-12 shrink-0 rounded-xl xl:h-14 xl:w-14"
                     imgClassName="h-full w-full object-cover"
                   />
-                  <span className="flex-1 text-[15px] font-medium text-ink">{category.name}</span>
+                  <span className="flex-1 text-[14px] font-medium text-ink xl:text-[15px]">{category.name}</span>
                 </a>
               </li>
             ))}

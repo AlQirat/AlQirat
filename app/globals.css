@@ -72,6 +72,27 @@ body {
   scrollbar-width: none;
 }
 
+.dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 154, 75, 0.55) transparent;
+}
+.dropdown-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.dropdown-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+.dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(201, 154, 75, 0.55);
+  border-radius: 999px;
+  border: 0;
+}
+.dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #c99a4b;
+}
+
 @layer components {
   .container-site {
     @apply mx-auto w-full max-w-site px-4 sm:px-8 lg:px-12;
