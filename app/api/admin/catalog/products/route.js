@@ -21,9 +21,18 @@ function normalizeVariants(value) {
   });
 }
 
+function formatProductDbError(error) {
+  if (error?.code === "23505" || error?.message?.includes("products_slug_key")) {
+    return "A product with this name already exists. Please enter a different product name.";
+  }
+  return error?.message || "Unable to save the product.";
+}
+
 function productPayload(body) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name || !body.category_id || !body.image_url) throw new Error("Name, category, and product image are required.");
+  const slug = createSlug(name);
+  if (!slug) throw new Error("Product name must include English letters or numbers.");
   const price = Number(body.price);
   const compareAtPrice = body.compare_at_price === undefined || body.compare_at_price === null || body.compare_at_price === "" ? null : Number(body.compare_at_price);
   const stockQuantity = Number(body.stock_quantity);
@@ -32,7 +41,7 @@ function productPayload(body) {
   if (!Number.isInteger(stockQuantity) || stockQuantity < 0) throw new Error("Enter a valid stock quantity.");
   return {
     name,
-    slug: createSlug(name),
+    slug,
     category_id: body.category_id,
     subcategory_id: body.subcategory_id || null,
     short_description: String(body.short_description || "").trim() || name,
@@ -64,7 +73,7 @@ export async function POST(request) {
     const payload = productPayload(await request.json());
     const supabase = createAdminCatalogClient();
     const { data, error } = await supabase.from("products").insert(payload).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ error: formatProductDbError(error) }, { status: 400 });
     return NextResponse.json({ product: data }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

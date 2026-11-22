@@ -21,17 +21,26 @@ function normalizeVariants(value) {
   });
 }
 
+function formatProductDbError(error) {
+  if (error?.code === "23505" || error?.message?.includes("products_slug_key")) {
+    return "A product with this name already exists. Please enter a different product name.";
+  }
+  return error?.message || "Unable to save the product.";
+}
+
 function buildPayload(body) {
   const name = String(body.name || "").trim();
   const price = Number(body.price);
   const compareAtPrice = body.compare_at_price === undefined || body.compare_at_price === null || body.compare_at_price === "" ? null : Number(body.compare_at_price);
   const stockQuantity = Number(body.stock_quantity);
   if (!name || !body.category_id || !body.image_url) throw new Error("Name, category, and product image are required.");
+  const slug = createSlug(name);
+  if (!slug) throw new Error("Product name must include English letters or numbers.");
   if (!Number.isFinite(price) || price < 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) throw new Error("Price or stock quantity is invalid.");
   if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < price)) throw new Error("MRP must be greater than or equal to the selling price.");
   return {
     name,
-    slug: createSlug(name),
+    slug,
     category_id: body.category_id,
     subcategory_id: body.subcategory_id || null,
     short_description: String(body.short_description || "").trim() || name,
@@ -54,7 +63,7 @@ export async function PATCH(request, { params }) {
   try {
     const supabase = createAdminCatalogClient();
     const { data, error } = await supabase.from("products").update(buildPayload(await request.json())).eq("id", params.id).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ error: formatProductDbError(error) }, { status: 400 });
     return NextResponse.json({ product: data });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
