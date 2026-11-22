@@ -23,6 +23,7 @@ import {
 import SmartImage from "@/components/SmartImage";
 import { uploadImage } from "@/lib/uploadImage";
 import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
+import { fragranceNotesToText, parseFragranceNoteText } from "@/lib/fragranceNotes";
 
 const inputClass =
   "mt-1.5 h-11 w-full rounded-xl border border-stone-200 bg-white px-3.5 text-sm text-ink outline-none transition focus:border-gold focus:ring-4 focus:ring-gold/10";
@@ -59,11 +60,15 @@ function initialForm(offer) {
 
 const emptyNewItem = {
   name: "",
-  variant_label: "6ml",
+  variant_label: "50ml",
   stock_quantity: "25",
-  price: "249",
-  compare_at_price: "349",
+  price: "180",
+  compare_at_price: "",
+  short_description: "",
   description: "",
+  top_notes: "",
+  heart_notes: "",
+  base_notes: "",
   images: [],
 };
 
@@ -80,6 +85,7 @@ export default function AdminComboOffer() {
   // Right column states: "active" | "create" | "catalog"
   const [productTab, setProductTab] = useState("create");
   const [newItem, setNewItem] = useState(emptyNewItem);
+  const [newItemImageUrl, setNewItemImageUrl] = useState("");
   const [creatingItem, setCreatingItem] = useState(false);
   const [uploadingItemImage, setUploadingItemImage] = useState(false);
   const [itemError, setItemError] = useState("");
@@ -87,6 +93,7 @@ export default function AdminComboOffer() {
 
   // Edit modal state
   const [editingItem, setEditingItem] = useState(null);
+  const [editItemImageUrl, setEditItemImageUrl] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [uploadingEditImage, setUploadingEditImage] = useState(false);
   const [togglingCatalogId, setTogglingCatalogId] = useState("");
@@ -191,14 +198,10 @@ export default function AdminComboOffer() {
     setUploadingItemImage(true);
     setItemError("");
     try {
-      const uploaded = [];
-      for (const file of files) {
-        const url = await uploadImage(file, "/al-qirat/combo-items");
-        uploaded.push(url);
-      }
+      const uploaded = await Promise.all(files.map((file) => uploadImage(file, "/al-qirat/combo-items")));
       setNewItem((current) => ({
         ...current,
-        images: [...current.images, ...uploaded],
+        images: [...new Set([...current.images, ...uploaded])],
       }));
     } catch (uploadError) {
       setItemError(uploadError.message);
@@ -206,6 +209,35 @@ export default function AdminComboOffer() {
       setUploadingItemImage(false);
       event.target.value = "";
     }
+  }
+
+  function addNewItemImageUrl() {
+    const url = newItemImageUrl.trim();
+    if (!/^https?:\/\//i.test(url) && !url.startsWith("/")) {
+      setItemError("Enter a valid image URL.");
+      return;
+    }
+    setNewItem((current) => ({
+      ...current,
+      images: [...new Set([...current.images, url])],
+    }));
+    setNewItemImageUrl("");
+    setItemError("");
+  }
+
+  function addEditItemImageUrl() {
+    if (!editingItem) return;
+    const url = editItemImageUrl.trim();
+    if (!/^https?:\/\//i.test(url) && !url.startsWith("/")) {
+      setItemError("Enter a valid image URL.");
+      return;
+    }
+    setEditingItem((current) => ({
+      ...current,
+      images: [...new Set([...current.images, url])],
+    }));
+    setEditItemImageUrl("");
+    setItemError("");
   }
 
   async function createComboProduct(event) {
@@ -228,7 +260,13 @@ export default function AdminComboOffer() {
           stock_quantity: Number(newItem.stock_quantity),
           price: Number(form?.default_unit_price || 180),
           compare_at_price: null,
-          description: newItem.description,
+          short_description: newItem.short_description || newItem.description || newItem.name,
+          description: newItem.description || newItem.short_description,
+          fragrance_notes: {
+            top: parseFragranceNoteText(newItem.top_notes),
+            heart: parseFragranceNoteText(newItem.heart_notes),
+            base: parseFragranceNoteText(newItem.base_notes),
+          },
           image_url: coverImage,
           gallery_urls: galleryImages,
         }),
@@ -304,6 +342,7 @@ export default function AdminComboOffer() {
       product.image_url,
       ...(Array.isArray(product.gallery_urls) ? product.gallery_urls : []),
     ].filter(Boolean);
+    const notesText = fragranceNotesToText(product.fragrance_notes);
     setEditingItem({
       id: product.id,
       show_in_shop: product.show_in_shop !== false,
@@ -312,7 +351,11 @@ export default function AdminComboOffer() {
       stock_quantity: String(product.stock_quantity ?? 0),
       price: String(product.combo_unit_price ?? product.price ?? 0),
       compare_at_price: product.compare_at_price ? String(product.compare_at_price) : "",
+      short_description: product.short_description || "",
       description: product.description || product.short_description || "",
+      top_notes: notesText.top || "",
+      heart_notes: notesText.heart || "",
+      base_notes: notesText.base || "",
       images: [...new Set(allImages)],
       sort_order: product.combo_sort_order ?? 0,
     });
@@ -361,7 +404,13 @@ export default function AdminComboOffer() {
           stock_quantity: Number(editingItem.stock_quantity),
           price: Number(form?.default_unit_price || editingItem.price || 180),
           compare_at_price: null,
-          description: editingItem.description,
+          short_description: editingItem.short_description || editingItem.description || editingItem.name,
+          description: editingItem.description || editingItem.short_description,
+          fragrance_notes: {
+            top: parseFragranceNoteText(editingItem.top_notes),
+            heart: parseFragranceNoteText(editingItem.heart_notes),
+            base: parseFragranceNoteText(editingItem.base_notes),
+          },
           image_url: coverImage,
           gallery_urls: galleryImages,
           sort_order: editingItem.sort_order,
@@ -872,60 +921,76 @@ export default function AdminComboOffer() {
                   </span>
                 </div>
 
-                {/* Multi-Image Uploader with Cover Picker */}
+                {/* Multi-Image Manager (Matches Products List: Grid + Primary/Remove + URL + Multi-Upload) */}
                 <div>
                   <span className="block text-xs font-semibold text-stone-600">
-                    Product Images (First image is Cover)
+                    Product Images (Multiple images supported — first image is Primary)
                   </span>
-                  <div className="mt-2 flex flex-wrap gap-2.5">
-                    {newItem.images.map((url, idx) => (
-                      <div
-                        key={url}
-                        className={`group relative h-20 w-20 overflow-hidden rounded-xl border-2 bg-white ${
-                          idx === 0 ? "border-gold" : "border-stone-200"
-                        }`}
-                      >
-                        <SmartImage
-                          src={url}
-                          alt=""
-                          className="h-full w-full"
-                          imgClassName="h-full w-full object-cover"
-                        />
-                        {idx === 0 ? (
-                          <span className="absolute bottom-0 inset-x-0 bg-forest py-0.5 text-center text-[9px] font-bold uppercase text-white">
-                            Cover
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setNewItem((curr) => {
-                                const rest = curr.images.filter((_, i) => i !== idx);
-                                return { ...curr, images: [url, ...rest] };
-                              })
-                            }
-                            className="absolute bottom-0 inset-x-0 bg-black/70 py-0.5 text-center text-[9px] font-semibold text-white opacity-0 transition group-hover:opacity-100"
-                          >
-                            Set Cover
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNewItem((curr) => ({
-                              ...curr,
-                              images: curr.images.filter((_, i) => i !== idx),
-                            }))
-                          }
-                          className="absolute right-1 top-1 rounded-full bg-black/65 p-0.5 text-white hover:bg-red-600"
+
+                  {newItem.images.length > 0 && (
+                    <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {newItem.images.map((url, idx) => (
+                        <div
+                          key={url}
+                          className={`overflow-hidden rounded-2xl border bg-cream ${
+                            idx === 0 ? "border-gold ring-2 ring-gold/20" : "border-stone-200"
+                          }`}
                         >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 bg-white text-xs font-semibold text-stone-500 transition hover:border-gold hover:text-gold-dark">
-                      <Upload size={16} />
-                      <span>{uploadingItemImage ? "Wait..." : "Upload"}</span>
+                          <SmartImage
+                            src={url}
+                            alt={`Product image ${idx + 1}`}
+                            className="aspect-square"
+                            imgClassName="h-full w-full object-contain"
+                          />
+                          <div className="flex items-center justify-between gap-2 border-t bg-white p-2">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() =>
+                                setNewItem((curr) => ({
+                                  ...curr,
+                                  images: [url, ...curr.images.filter((_, i) => i !== idx)],
+                                }))
+                              }
+                              className="text-[11px] font-semibold text-gold-dark disabled:text-emerald-600"
+                            >
+                              {idx === 0 ? "Primary" : "Set primary"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewItem((curr) => ({
+                                  ...curr,
+                                  images: curr.images.filter((_, i) => i !== idx),
+                                }))
+                              }
+                              className="text-[11px] font-semibold text-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-2.5 flex gap-2">
+                    <input
+                      value={newItemImageUrl}
+                      onChange={(event) => setNewItemImageUrl(event.target.value)}
+                      className="h-11 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-gold"
+                      placeholder="ImageKit or image URL"
+                    />
+                    <button
+                      type="button"
+                      onClick={addNewItemImageUrl}
+                      className="h-11 rounded-xl border border-stone-200 bg-white px-3.5 text-xs font-semibold text-ink transition hover:border-gold"
+                    >
+                      Add URL
+                    </button>
+                    <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-xs font-semibold text-ink transition hover:border-gold hover:bg-cream">
+                      <Upload size={15} />
+                      <span>{uploadingItemImage ? "Uploading..." : "Upload"}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -936,6 +1001,9 @@ export default function AdminComboOffer() {
                       />
                     </label>
                   </div>
+                  <p className="mt-1.5 text-[11px] text-stone-500">
+                    Select or upload multiple images at once. All uploaded images appear in the Product Details gallery.
+                  </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -978,15 +1046,56 @@ export default function AdminComboOffer() {
                 </p>
 
                 <label className="block text-xs font-semibold text-stone-600">
-                  Short Notes / Description
+                  Short Description (Card Summary) *
+                  <input
+                    required
+                    value={newItem.short_description}
+                    onChange={(e) => setNewItem((curr) => ({ ...curr, short_description: e.target.value }))}
+                    placeholder="e.g. Royal Kashmiri saffron, warm amber and aged agarwood extrait de parfum"
+                    className={inputClass}
+                  />
+                </label>
+
+                <label className="block text-xs font-semibold text-stone-600">
+                  Full Description (Product Details Page)
                   <textarea
                     rows={2}
                     value={newItem.description}
                     onChange={(e) => setNewItem((curr) => ({ ...curr, description: e.target.value }))}
-                    placeholder="Rich woody agarwood blended with warm amber and smoky spice..."
+                    placeholder="Detailed fragrance story and wearing occasion shown on the product details page..."
                     className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm outline-none focus:border-gold"
                   />
                 </label>
+
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                  <label className="text-xs font-semibold text-stone-600">
+                    Top Notes
+                    <input
+                      value={newItem.top_notes}
+                      onChange={(e) => setNewItem((curr) => ({ ...curr, top_notes: e.target.value }))}
+                      placeholder="Saffron, Bergamot"
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-600">
+                    Heart Notes
+                    <input
+                      value={newItem.heart_notes}
+                      onChange={(e) => setNewItem((curr) => ({ ...curr, heart_notes: e.target.value }))}
+                      placeholder="Rose, Jasmine, Amber"
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-600">
+                    Base Notes
+                    <input
+                      value={newItem.base_notes}
+                      onChange={(e) => setNewItem((curr) => ({ ...curr, base_notes: e.target.value }))}
+                      placeholder="Oud, Sandalwood, Musk"
+                      className={inputClass}
+                    />
+                  </label>
+                </div>
 
                 <button
                   type="submit"
@@ -1133,16 +1242,14 @@ export default function AdminComboOffer() {
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1.5">
-                          {isExclusive && (
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(product)}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-stone-200 text-stone-600 transition hover:border-gold hover:text-ink"
-                              title="Edit combo-only product"
-                            >
-                              <Edit3 size={15} />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(product)}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-stone-200 text-stone-600 transition hover:border-gold hover:text-ink"
+                            title="Edit product & gallery images"
+                          >
+                            <Edit3 size={15} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => removeComboProduct(product)}
@@ -1190,71 +1297,84 @@ export default function AdminComboOffer() {
 
             <form onSubmit={saveEditedItem} className="mt-4 space-y-4">
               <div>
-                <span className="block text-xs font-semibold text-stone-600">Product Images</span>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {editingItem.images.map((url, idx) => (
-                    <div
-                      key={url}
-                      className={`group relative h-16 w-16 overflow-hidden rounded-xl border-2 ${
-                        idx === 0 ? "border-gold" : "border-stone-200"
-                      }`}
-                    >
-                      <SmartImage
-                        src={url}
-                        alt=""
-                        className="h-full w-full"
-                        imgClassName="h-full w-full object-cover"
-                      />
-                      {idx === 0 ? (
-                        <span className="absolute bottom-0 inset-x-0 bg-forest py-0.5 text-center text-[8px] font-bold uppercase text-white">
-                          Cover
-                        </span>
-                      ) : (
-                        editingItem.show_in_shop === false && (
+                <span className="block text-xs font-semibold text-stone-600">
+                  Product Images (First image is Primary)
+                </span>
+                {editingItem.images.length > 0 && (
+                  <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {editingItem.images.map((url, idx) => (
+                      <div
+                        key={url}
+                        className={`overflow-hidden rounded-2xl border bg-cream ${
+                          idx === 0 ? "border-gold ring-2 ring-gold/20" : "border-stone-200"
+                        }`}
+                      >
+                        <SmartImage
+                          src={url}
+                          alt={`Product image ${idx + 1}`}
+                          className="aspect-square"
+                          imgClassName="h-full w-full object-contain"
+                        />
+                        <div className="flex items-center justify-between gap-2 border-t bg-white p-2">
                           <button
                             type="button"
+                            disabled={idx === 0}
                             onClick={() =>
-                              setEditingItem((curr) => {
-                                const rest = curr.images.filter((_, i) => i !== idx);
-                                return { ...curr, images: [url, ...rest] };
-                              })
+                              setEditingItem((curr) => ({
+                                ...curr,
+                                images: [url, ...curr.images.filter((_, i) => i !== idx)],
+                              }))
                             }
-                            className="absolute bottom-0 inset-x-0 bg-black/70 py-0.5 text-center text-[8px] font-semibold text-white opacity-0 group-hover:opacity-100"
+                            className="text-[11px] font-semibold text-gold-dark disabled:text-emerald-600"
                           >
-                            Cover
+                            {idx === 0 ? "Primary" : "Set primary"}
                           </button>
-                        )
-                      )}
-                      {editingItem.show_in_shop === false && editingItem.images.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditingItem((curr) => ({
-                              ...curr,
-                              images: curr.images.filter((_, i) => i !== idx),
-                            }))
-                          }
-                          className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white hover:bg-red-600"
-                        >
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {editingItem.show_in_shop === false && (
-                    <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-300 text-[10px] font-semibold text-stone-500 hover:border-gold">
-                      <Upload size={14} />
-                      <span>{uploadingEditImage ? "..." : "Add"}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleEditModalImages}
-                        className="hidden"
-                        disabled={uploadingEditImage}
-                      />
-                    </label>
-                  )}
+                          {editingItem.images.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingItem((curr) => ({
+                                  ...curr,
+                                  images: curr.images.filter((_, i) => i !== idx),
+                                }))
+                              }
+                              className="text-[11px] font-semibold text-red-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-2.5 flex gap-2">
+                  <input
+                    value={editItemImageUrl}
+                    onChange={(event) => setEditItemImageUrl(event.target.value)}
+                    className="h-11 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-gold"
+                    placeholder="ImageKit or image URL"
+                  />
+                  <button
+                    type="button"
+                    onClick={addEditItemImageUrl}
+                    className="h-11 rounded-xl border border-stone-200 bg-white px-3.5 text-xs font-semibold text-ink transition hover:border-gold"
+                  >
+                    Add URL
+                  </button>
+                  <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-xs font-semibold text-ink transition hover:border-gold hover:bg-cream">
+                    <Upload size={15} />
+                    <span>{uploadingEditImage ? "Uploading..." : "Upload"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleEditModalImages}
+                      className="hidden"
+                      disabled={uploadingEditImage}
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -1293,15 +1413,54 @@ export default function AdminComboOffer() {
               </div>
 
               {editingItem.show_in_shop === false && (
-                <label className="block text-xs font-semibold text-stone-600">
-                  Description
-                  <textarea
-                    rows={3}
-                    value={editingItem.description}
-                    onChange={(e) => setEditingItem((curr) => ({ ...curr, description: e.target.value }))}
-                    className="mt-1.5 w-full rounded-xl border border-stone-200 p-3 text-sm outline-none focus:border-gold"
-                  />
-                </label>
+                <>
+                  <label className="block text-xs font-semibold text-stone-600">
+                    Short Description (Card Summary)
+                    <input
+                      value={editingItem.short_description}
+                      onChange={(e) => setEditingItem((curr) => ({ ...curr, short_description: e.target.value }))}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="block text-xs font-semibold text-stone-600">
+                    Full Description (Product Details Page)
+                    <textarea
+                      rows={3}
+                      value={editingItem.description}
+                      onChange={(e) => setEditingItem((curr) => ({ ...curr, description: e.target.value }))}
+                      className="mt-1.5 w-full rounded-xl border border-stone-200 p-3 text-sm outline-none focus:border-gold"
+                    />
+                  </label>
+                  <div className="grid gap-2.5 sm:grid-cols-3">
+                    <label className="text-xs font-semibold text-stone-600">
+                      Top Notes
+                      <input
+                        value={editingItem.top_notes}
+                        onChange={(e) => setEditingItem((curr) => ({ ...curr, top_notes: e.target.value }))}
+                        placeholder="Saffron, Bergamot"
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="text-xs font-semibold text-stone-600">
+                      Heart Notes
+                      <input
+                        value={editingItem.heart_notes}
+                        onChange={(e) => setEditingItem((curr) => ({ ...curr, heart_notes: e.target.value }))}
+                        placeholder="Rose, Jasmine"
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="text-xs font-semibold text-stone-600">
+                      Base Notes
+                      <input
+                        value={editingItem.base_notes}
+                        onChange={(e) => setEditingItem((curr) => ({ ...curr, base_notes: e.target.value }))}
+                        placeholder="Oud, Musk"
+                        className={inputClass}
+                      />
+                    </label>
+                  </div>
+                </>
               )}
 
               <div className="flex justify-end gap-2 pt-2">

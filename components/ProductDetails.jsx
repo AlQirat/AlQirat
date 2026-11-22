@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import {
+  ArrowLeft,
   Check,
+  Gift,
   Minus,
   PackageCheck,
   Plus,
@@ -14,11 +16,13 @@ import {
   Truck,
   Zap,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
 import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
-import { useStorefrontCatalog } from "./useStorefrontData";
+import { useStorefrontCatalog, useStorefrontComboOffer } from "./useStorefrontData";
+import { readComboDraft, writeComboDraft } from "@/lib/comboPricing";
 import ProductGallery from "./ProductGallery";
 import ProductReviews from "./ProductReviews";
 import PriceDisplay from "./PriceDisplay";
@@ -44,6 +48,7 @@ function getDescription(product) {
     Attars: "A traditional concentrated perfume oil, made to be worn close to the skin.",
     "Gift Sets": "A considered gift set from Al Qirat, presented for someone special.",
     "Special Editions": "An exclusive Al Qirat edition for true connoisseurs.",
+    "Combo Collection": "Crafted with long-lasting luxury fragrance oils for your custom Al Qirat combo set.",
   };
 
   return [product.desc, categoryDescriptions[product.category]].filter(Boolean).join(". ") + ".";
@@ -56,19 +61,62 @@ const serviceItems = [
   { icon: PackageCheck, title: "Premium Packing", text: "Ready for gifting" },
 ];
 
-export default function ProductDetails({ product: initialProduct, initialCatalog }) {
+export default function ProductDetails({
+  product: initialProduct,
+  initialCatalog,
+  initialComboOffer = null,
+  fromCombos = false,
+}) {
+  const router = useRouter();
   const { addItem } = useCart();
   const { products: liveProducts, error: catalogError } = useStorefrontCatalog(initialCatalog);
+  const { data: comboData } = useStorefrontComboOffer({ offer: initialComboOffer });
+  const comboOffer = comboData?.offer || initialComboOffer;
+
   const product = liveProducts.find((item) => item.slug === initialProduct.slug) || initialProduct;
-  const similarProducts = liveProducts.filter((item) => item.slug !== product.slug).sort((a, b) => Number(b.category === product.category) - Number(a.category === product.category)).slice(0, 4);
+  const isComboMode = Boolean(fromCombos || product.showInShop === false);
+
+  const similarProducts = isComboMode && comboOffer?.products?.length
+    ? comboOffer.products
+        .filter((item) => item.slug !== product.slug)
+        .slice(0, 4)
+        .map((item) => ({
+          id: item.product_id || item.id,
+          slug: item.slug,
+          name: item.name,
+          src: item.image_url,
+          subCategory:
+            item.variant_label && String(item.variant_label).toLowerCase() !== "standard"
+              ? item.variant_label
+              : "Combo Fragrance",
+          price: Number(item.unit_price ?? comboOffer.default_unit_price ?? item.price ?? 180),
+          compareAtPrice: null,
+          reviews: 0,
+          rating: 0,
+          tone: "from-sage to-cream",
+          href: `/products/${item.slug}?from=combos`,
+        }))
+    : liveProducts
+        .filter((item) => item.slug !== product.slug)
+        .sort((a, b) => Number(b.category === product.category) - Number(a.category === product.category))
+        .slice(0, 4);
+
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
 
-  const variants = product.variants || [];
+  const variants = !isComboMode ? product.variants || [] : [];
   const hasVariants = variants.length > 0;
-  const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-  const displayCompareAtPrice = selectedVariant?.compare_at_price ?? (hasVariants ? variants[0]?.compare_at_price : product.compareAtPrice);
+  const comboUnitPrice = Number(comboOffer?.default_unit_price ?? product.price ?? 180);
+  const displayPrice = isComboMode
+    ? comboUnitPrice
+    : selectedVariant
+      ? selectedVariant.price
+      : product.price;
+  const displayCompareAtPrice = isComboMode
+    ? null
+    : selectedVariant?.compare_at_price ??
+      (hasVariants ? variants[0]?.compare_at_price : product.compareAtPrice);
 
   const addToCart = () => {
     const item = hasVariants && selectedVariant ? { ...product, price: selectedVariant.price, variant: selectedVariant } : product;
@@ -83,6 +131,34 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
     window.setTimeout(() => window.location.assign("/checkout"), 100);
   };
 
+  const addToComboDraft = () => {
+    const offerId = comboOffer?.id || null;
+    const productId = String(product.id || "");
+    if (productId) {
+      const draft = readComboDraft(offerId);
+      const currentQty = Number(draft.quantities?.[productId] || 0);
+      const maxTotal = Math.max(2, Number(comboOffer?.max_quantity) || 40);
+      const currentTotal = Object.values(draft.quantities || {}).reduce(
+        (sum, q) => sum + (Number(q) || 0),
+        0,
+      );
+      const room = Math.max(0, maxTotal - currentTotal);
+      const addable = Math.min(quantity, room > 0 ? room : quantity);
+      const nextQuantities = {
+        ...(draft.quantities || {}),
+        [productId]: currentQty + addable,
+      };
+      const bundleQty = Math.max(2, Number(comboOffer?.bundle_quantity) || 3);
+      const nextTotal = currentTotal + addable;
+      const nextSets = Math.max(draft.targetSets || 1, Math.ceil(nextTotal / bundleQty));
+      writeComboDraft(offerId, nextQuantities, nextSets);
+    }
+    setAdded(true);
+    window.setTimeout(() => {
+      router.push("/combos");
+    }, 450);
+  };
+
   return (
     <main className="overflow-x-clip bg-cream text-ink">
       {catalogError && <p role="alert" className="mx-auto mt-5 max-w-7xl rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Catalog synchronization failed: {catalogError}</p>}
@@ -91,21 +167,38 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
         <div className="pointer-events-none absolute -right-52 bottom-0 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(201,154,75,0.18),transparent_65%)]" />
 
         <div className="container-site relative">
-          <nav aria-label="Breadcrumb" className="mb-7 flex flex-wrap items-center gap-2 text-sm text-stone-500">
-            <a href="/" className="transition hover:text-gold-dark">Home</a>
-            <span aria-hidden="true">/</span>
-            <a href="/all-products" className="transition hover:text-gold-dark">All Products</a>
-            <span aria-hidden="true">/</span>
-            <span className="text-ink">{product.name}</span>
-          </nav>
+          <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
+            <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+              <a href="/" className="transition hover:text-gold-dark">Home</a>
+              <span aria-hidden="true">/</span>
+              {isComboMode ? (
+                <a href="/combos" className="transition hover:text-gold-dark">Combos</a>
+              ) : (
+                <a href="/all-products" className="transition hover:text-gold-dark">All Products</a>
+              )}
+              <span aria-hidden="true">/</span>
+              <span className="text-ink">{product.name}</span>
+            </nav>
+
+            {isComboMode && (
+              <a
+                href="/combos"
+                className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-white px-4 py-2 text-xs font-bold text-ink shadow-2xs transition hover:border-forest hover:bg-forest hover:text-white"
+              >
+                <ArrowLeft size={14} /> Back to Combo Set
+              </a>
+            )}
+          </div>
 
           <div className="grid min-w-0 items-start gap-9 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
             <Reveal from="left">
               <div className="relative overflow-visible">
                 <ProductGallery product={product} />
-                <span className="absolute left-7 top-7 rounded-full border border-gold/30 bg-white/90 px-3 py-1.5 text-xs font-bold text-stone-700 shadow-sm backdrop-blur-sm sm:left-[150px]">
-                  {product.subCategory}
-                </span>
+                {product.subCategory && product.subCategory !== "General" && (
+                  <span className="absolute left-7 top-7 rounded-full border border-gold/30 bg-white/90 px-3 py-1.5 text-xs font-bold text-stone-700 shadow-sm backdrop-blur-sm sm:left-[150px]">
+                    {product.subCategory}
+                  </span>
+                )}
                 {product.badge && (
                   <span className="absolute right-7 top-7 rounded-full bg-gradient-to-b from-gold-light to-gold px-3 py-1.5 text-xs font-bold uppercase text-ink shadow-lg">
                     {product.badge}
@@ -115,7 +208,9 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
             </Reveal>
 
             <Reveal from="right" className="lg:pt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-dark">{product.category}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-dark">
+                {isComboMode ? "Combo Collection" : product.category}
+              </p>
               <h1 className="mt-3 break-words font-serif text-4xl font-semibold leading-tight sm:text-5xl lg:text-[58px]">
                 {product.name}
               </h1>
@@ -167,7 +262,11 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
               )}
 
               <PriceDisplay price={displayPrice} compareAtPrice={displayCompareAtPrice} showMrpAfterPrice className="mt-7" priceClassName="text-4xl font-bold" mrpClassName="text-lg font-medium text-stone-400" />
-              <p className="mt-1 text-sm text-stone-500">Inclusive of all taxes</p>
+              <p className="mt-1 text-sm text-stone-500">
+                {isComboMode && comboOffer
+                  ? `Eligible for "${comboOffer.title}" (${comboOffer.bundle_quantity} bottles for ₹${comboOffer.combo_price}) · Inclusive of all taxes`
+                  : "Inclusive of all taxes"}
+              </p>
 
               <div className="mt-7 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)]">
                 <p className="text-sm font-semibold uppercase tracking-wide text-stone-600 sm:hidden">Quantity</p>
@@ -191,26 +290,52 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={addToCart}
-                  className={`col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold transition duration-300 sm:col-span-1 ${
-                    added
-                      ? "bg-emerald-600 text-white"
-                      : "bg-ink text-white hover:bg-gradient-to-b hover:from-gold-light hover:to-gold hover:text-ink"
-                  }`}
-                >
-                  {added ? <Check size={18} /> : <ShoppingBag size={18} />}
-                  {added ? `Added ${quantity} to Cart` : "Add to Cart"}
-                </button>
+                {isComboMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={addToComboDraft}
+                      className={`col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold transition duration-300 sm:col-span-1 ${
+                        added
+                          ? "bg-forest text-white"
+                          : "bg-ink text-white hover:bg-forest"
+                      }`}
+                    >
+                      {added ? <Check size={18} /> : <Gift size={18} />}
+                      {added ? `Added ${quantity} to Combo Set` : "Add to Combo Set"}
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={buyNow}
-                  className="col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full border border-gold-dark bg-gradient-to-b from-gold-light to-gold px-7 text-sm font-semibold text-ink shadow-[0_10px_28px_-14px_rgba(201,154,75,0.8)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-14px_rgba(201,154,75,0.9)] sm:col-span-1"
-                >
-                  <Zap size={18} /> Buy Now
-                </button>
+                    <a
+                      href="/combos"
+                      className="col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full border border-gold-dark bg-gradient-to-b from-gold-light to-gold px-7 text-sm font-semibold text-ink shadow-[0_10px_28px_-14px_rgba(201,154,75,0.8)] transition duration-300 hover:-translate-y-0.5 sm:col-span-1"
+                    >
+                      <ArrowLeft size={17} /> View Combo Set
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={addToCart}
+                      className={`col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold transition duration-300 sm:col-span-1 ${
+                        added
+                          ? "bg-emerald-600 text-white"
+                          : "bg-ink text-white hover:bg-gradient-to-b hover:from-gold-light hover:to-gold hover:text-ink"
+                      }`}
+                    >
+                      {added ? <Check size={18} /> : <ShoppingBag size={18} />}
+                      {added ? `Added ${quantity} to Cart` : "Add to Cart"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={buyNow}
+                      className="col-span-2 flex h-[52px] min-h-[52px] w-full shrink-0 items-center justify-center gap-2 rounded-full border border-gold-dark bg-gradient-to-b from-gold-light to-gold px-7 text-sm font-semibold text-ink shadow-[0_10px_28px_-14px_rgba(201,154,75,0.8)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-14px_rgba(201,154,75,0.9)] sm:col-span-1"
+                    >
+                      <Zap size={18} /> Buy Now
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-3">
@@ -236,47 +361,59 @@ export default function ProductDetails({ product: initialProduct, initialCatalog
           <Reveal className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-dark">You May Also Like</p>
-              <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">Similar Products</h2>
-              <p className="mt-3 text-stone-500">More favourites from {product.category}.</p>
+              <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">
+                {isComboMode ? "More Combo Fragrances" : "Similar Products"}
+              </h2>
+              <p className="mt-3 text-stone-500">
+                {isComboMode
+                  ? "Mix and match any of these fragrances in your combo set."
+                  : `More favourites from ${product.category}.`}
+              </p>
             </div>
-            <a href="/all-products" className="rounded-full border border-gold/50 px-5 py-2.5 text-sm font-semibold transition hover:bg-gold">
-              View All Products
+            <a
+              href={isComboMode ? "/combos" : "/all-products"}
+              className="rounded-full border border-gold/50 px-5 py-2.5 text-sm font-semibold transition hover:bg-gold"
+            >
+              {isComboMode ? "Back to Combos" : "View All Products"}
             </a>
           </Reveal>
 
           <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-            {similarProducts.map((similarProduct, index) => (
-              <Reveal key={similarProduct.name} delay={index * 80} from="zoom">
-                <article className="group h-full overflow-hidden rounded-3xl border border-stone-200 bg-cream shadow-[0_14px_35px_-24px_rgba(21,16,12,0.55)] transition duration-500 hover:-translate-y-2 hover:border-gold/60 hover:shadow-[0_28px_55px_-28px_rgba(201,154,75,0.75)]">
-                  <a href={getProductPath(similarProduct)} className="block">
-                    <SmartImage
-                      src={similarProduct.src}
-                      alt={similarProduct.name}
-                      tone={similarProduct.tone}
-                      className="w-full"
-                      imgClassName="block h-auto w-full object-contain transition duration-700 group-hover:brightness-105"
-                    />
-                  </a>
-                  <div className="p-3 sm:p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-dark">
-                      {similarProduct.subCategory}
-                    </p>
-                    <h3 className="mt-2 text-base font-bold sm:text-lg">
-                      <a href={getProductPath(similarProduct)} className="transition hover:text-gold-dark">
-                        {similarProduct.name}
-                      </a>
-                    </h3>
-                    {similarProduct.reviews > 0 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Stars value={similarProduct.rating} size={13} />
-                        <span className="text-xs text-stone-500">({similarProduct.reviews})</span>
-                      </div>
-                    )}
-                    <PriceDisplay price={similarProduct.price} compareAtPrice={similarProduct.compareAtPrice} className="mt-3" priceClassName="text-xl font-bold sm:text-2xl" mrpClassName="text-[10px] font-medium text-stone-400 sm:text-xs" />
-                  </div>
-                </article>
-              </Reveal>
-            ))}
+            {similarProducts.map((similarProduct, index) => {
+              const targetHref = similarProduct.href || getProductPath(similarProduct);
+              return (
+                <Reveal key={similarProduct.slug || similarProduct.name} delay={index * 80} from="zoom">
+                  <article className="group h-full overflow-hidden rounded-3xl border border-stone-200 bg-cream shadow-[0_14px_35px_-24px_rgba(21,16,12,0.55)] transition duration-500 hover:-translate-y-2 hover:border-gold/60 hover:shadow-[0_28px_55px_-28px_rgba(201,154,75,0.75)]">
+                    <a href={targetHref} className="block">
+                      <SmartImage
+                        src={similarProduct.src}
+                        alt={similarProduct.name}
+                        tone={similarProduct.tone}
+                        className="w-full"
+                        imgClassName="block h-auto w-full object-contain transition duration-700 group-hover:brightness-105"
+                      />
+                    </a>
+                    <div className="p-3 sm:p-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-dark">
+                        {similarProduct.subCategory}
+                      </p>
+                      <h3 className="mt-2 text-base font-bold sm:text-lg">
+                        <a href={targetHref} className="transition hover:text-gold-dark">
+                          {similarProduct.name}
+                        </a>
+                      </h3>
+                      {similarProduct.reviews > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Stars value={similarProduct.rating} size={13} />
+                          <span className="text-xs text-stone-500">({similarProduct.reviews})</span>
+                        </div>
+                      )}
+                      <PriceDisplay price={similarProduct.price} compareAtPrice={similarProduct.compareAtPrice} className="mt-3" priceClassName="text-xl font-bold sm:text-2xl" mrpClassName="text-[10px] font-medium text-stone-400 sm:text-xs" />
+                    </div>
+                  </article>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
       </section>

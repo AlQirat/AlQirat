@@ -3,16 +3,33 @@ import { cache } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductDetails from "@/components/ProductDetails";
-import { loadCatalogForPage } from "@/lib/storefrontServer";
+import {
+  fetchStorefrontComboOffer,
+  fetchStorefrontProductBySlug,
+  loadCatalogForPage,
+  loadContentForPage,
+} from "@/lib/storefrontServer";
 import { mapStorefrontProduct } from "@/lib/storefrontProducts";
 
 export const dynamic = "force-dynamic";
 
 // generateMetadata and the page both need the product; cache() makes that a single database read per request.
 const loadProduct = cache(async (slug) => {
-  const catalog = await loadCatalogForPage();
-  const row = catalog.products.find((product) => product.slug === slug);
-  return { catalog, product: row ? mapStorefrontProduct(row) : null };
+  const [catalog, content, comboOffer] = await Promise.all([
+    loadCatalogForPage(),
+    loadContentForPage(),
+    fetchStorefrontComboOffer().catch(() => null),
+  ]);
+  let row = catalog.products.find((product) => product.slug === slug) || null;
+  if (!row) {
+    row = await fetchStorefrontProductBySlug(slug).catch(() => null);
+  }
+  return {
+    catalog,
+    content,
+    comboOffer: comboOffer?.is_active ? comboOffer : null,
+    product: row ? mapStorefrontProduct(row) : null,
+  };
 });
 
 export async function generateMetadata({ params }) {
@@ -25,14 +42,21 @@ export async function generateMetadata({ params }) {
   };
 }
 
-export default async function ProductPage({ params }) {
-  const { catalog, product } = await loadProduct(params.slug);
+export default async function ProductPage({ params, searchParams }) {
+  const { catalog, content, comboOffer, product } = await loadProduct(params.slug);
   if (!product) notFound();
+
+  const fromCombos = searchParams?.from === "combos" || product.showInShop === false;
 
   return (
     <>
-      <Header initialCatalog={catalog} />
-      <ProductDetails product={product} initialCatalog={catalog} />
+      <Header initialCatalog={catalog} initialContent={content} />
+      <ProductDetails
+        product={product}
+        initialCatalog={catalog}
+        initialComboOffer={comboOffer}
+        fromCombos={fromCombos}
+      />
       <Footer />
     </>
   );

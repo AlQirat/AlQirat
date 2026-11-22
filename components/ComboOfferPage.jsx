@@ -3,35 +3,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  ChevronLeft,
-  ChevronRight,
   CreditCard,
+  Eye,
   Minus,
   Plus,
   Sparkles,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SmartImage from "./SmartImage";
 import PriceDisplay from "./PriceDisplay";
 import { useCart } from "./CartProvider";
 import { useStorefrontComboOffer } from "./useStorefrontData";
-import { calculateComboPricing } from "@/lib/comboPricing";
+import {
+  calculateComboPricing,
+  clearComboDraft,
+  readComboDraft,
+  writeComboDraft,
+} from "@/lib/comboPricing";
 
 function currency(value) {
   return `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
-
-function getNotesList(notes) {
-  if (!notes || typeof notes !== "object") return [];
-  const all = [
-    ...(Array.isArray(notes.top) ? notes.top : []),
-    ...(Array.isArray(notes.heart) ? notes.heart : []),
-    ...(Array.isArray(notes.base) ? notes.base : []),
-  ]
-    .map((n) => String(n || "").trim())
-    .filter(Boolean);
-  return [...new Set(all)].slice(0, 6);
 }
 
 export default function ComboOfferPage({ initialOffer }) {
@@ -42,14 +35,31 @@ export default function ComboOfferPage({ initialOffer }) {
 
   const [quantities, setQuantities] = useState({});
   const [targetSets, setTargetSets] = useState(1);
-  const [activeModalProduct, setActiveModalProduct] = useState(null);
-  const [modalImageIdx, setModalImageIdx] = useState(0);
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const [toast, setToast] = useState("");
-  const [confettiPieces, setConfettiPieces] = useState([]);
   const prevTotalRef = useRef(0);
   const gridRef = useRef(null);
 
+  // Hydrate saved combo slot selections from localStorage so visiting a Product Details Page never loses selected bottles
   useEffect(() => {
+    if (!offer?.id) return;
+    const draft = readComboDraft(offer.id);
+    const validQuantities = Object.fromEntries(
+      Object.entries(draft.quantities || {}).filter(([productId, qty]) =>
+        Number(qty) > 0 &&
+        offer?.products?.some((product) => String(product.product_id || product.id) === productId),
+      ),
+    );
+    setQuantities(validQuantities);
+    setTargetSets(draft.targetSets || 1);
+    const initialTotal = Object.values(validQuantities).reduce((sum, q) => sum + (Number(q) || 0), 0);
+    prevTotalRef.current = initialTotal;
+    setDraftHydrated(true);
+  }, [offer?.id]);
+
+  // Keep quantities filtered if eligible products change
+  useEffect(() => {
+    if (!draftHydrated || !offer) return;
     setQuantities((current) =>
       Object.fromEntries(
         Object.entries(current).filter(([productId]) =>
@@ -57,7 +67,13 @@ export default function ComboOfferPage({ initialOffer }) {
         ),
       ),
     );
-  }, [offer]);
+  }, [offer, draftHydrated]);
+
+  // Persist draft selection to localStorage whenever quantities or targetSets change
+  useEffect(() => {
+    if (!draftHydrated || !offer?.id) return;
+    writeComboDraft(offer.id, quantities, targetSets);
+  }, [quantities, targetSets, offer?.id, draftHydrated]);
 
   const bundleQuantity = Math.max(2, Number(offer?.bundle_quantity) || 4);
   const maxQuantity = Math.max(bundleQuantity, Number(offer?.max_quantity) || bundleQuantity * 10);
@@ -89,6 +105,7 @@ export default function ComboOfferPage({ initialOffer }) {
   const progressPercent = Math.min(100, Math.round((totalSelected / currentTargetBottles) * 100));
 
   useEffect(() => {
+    if (!draftHydrated) return;
     if (totalSelected < prevTotalRef.current) {
       const shrunkSets = Math.max(1, Math.ceil(totalSelected / bundleQuantity));
       if (shrunkSets < targetSets) setTargetSets(shrunkSets);
@@ -108,28 +125,13 @@ export default function ComboOfferPage({ initialOffer }) {
       prevTotalRef.current = totalSelected;
     }
     prevTotalRef.current = totalSelected;
-    return undefined;
-  }, [totalSelected, bundleQuantity, pricing.discount, targetSets]);
+  }, [totalSelected, bundleQuantity, pricing.discount, targetSets, draftHydrated]);
 
   useEffect(() => {
     if (!toast) return undefined;
     const id = setTimeout(() => setToast(""), 3800);
     return () => clearTimeout(id);
   }, [toast]);
-
-  useEffect(() => {
-    if (!activeModalProduct) return undefined;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") setActiveModalProduct(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [activeModalProduct]);
 
   function canIncrementProduct(product) {
     if (!offer) return false;
@@ -170,13 +172,13 @@ export default function ComboOfferPage({ initialOffer }) {
       return;
     }
     addComboItem(offer, selections, { replace: true });
+    clearComboDraft();
     setToast(`${totalSelected} bottles added to your bag. Redirecting to checkout...`);
     router.push("/checkout");
   }
 
-  function openProductModal(product) {
-    setActiveModalProduct(product);
-    setModalImageIdx(0);
+  function getProductDetailsHref(product) {
+    return `/products/${product.slug}?from=combos`;
   }
 
   if (error) {
@@ -205,36 +207,8 @@ export default function ComboOfferPage({ initialOffer }) {
     );
   }
 
-  const modalImages = activeModalProduct
-    ? [
-        activeModalProduct.image_url,
-        ...(Array.isArray(activeModalProduct.gallery_urls) ? activeModalProduct.gallery_urls : []),
-      ].filter(Boolean)
-    : [];
-  const modalUniqueImages = [...new Set(modalImages)];
-  const modalProductId = activeModalProduct ? String(activeModalProduct.product_id || activeModalProduct.id) : "";
-  const modalQuantity = modalProductId ? quantities[modalProductId] || 0 : 0;
-  const modalNotes = activeModalProduct ? getNotesList(activeModalProduct.fragrance_notes) : [];
-
   return (
     <main className="min-h-screen overflow-x-clip bg-cream pb-56 text-ink">
-      {/* Confetti Celebration Overlay */}
-      {confettiPieces.length > 0 && (
-        <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden="true">
-          {confettiPieces.map((piece) => (
-            <span
-              key={piece.id}
-              style={{
-                left: piece.left,
-                backgroundColor: piece.color,
-                animationDelay: piece.delay,
-              }}
-              className="absolute top-1/3 h-3 w-2.5 animate-bounce rounded-xs opacity-90 shadow-xs"
-            />
-          ))}
-        </div>
-      )}
-
       {/* Floating Toast Notification */}
       {toast && (
         <div
@@ -269,7 +243,6 @@ export default function ComboOfferPage({ initialOffer }) {
             imgClassName="h-full w-full object-cover object-bottom"
           />
         </div>
-        {/* Readability gradient overlay: keeps text on the left (desktop) and top (mobile) crisp while showcasing bottles on the right/bottom */}
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-cream/85 via-cream/45 to-transparent md:bg-gradient-to-r md:from-cream/85 md:via-cream/45 md:via-45% md:to-transparent md:to-70%" />
 
         <div className="container-site relative z-10 flex min-h-[460px] flex-col justify-center py-12 sm:py-16 md:min-h-[480px] lg:min-h-[520px]">
@@ -321,12 +294,12 @@ export default function ComboOfferPage({ initialOffer }) {
               product.variant_label && product.variant_label.toLowerCase() !== "standard"
                 ? product.variant_label
                 : "";
+            const productHref = getProductDetailsHref(product);
 
             return (
               <article
                 key={productId}
-                onClick={() => openProductModal(product)}
-                className={`group relative flex h-full min-w-0 cursor-pointer select-none flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] transition duration-500 ${
+                className={`group relative flex h-full min-w-0 select-none flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] transition duration-500 ${
                   quantity > 0
                     ? "ring-2 ring-gold shadow-[0_20px_45px_-18px_rgba(201,154,75,0.55)]"
                     : reachedSetGoal || soldOut
@@ -334,7 +307,7 @@ export default function ComboOfferPage({ initialOffer }) {
                       : "ring-1 ring-stone-200 hover:-translate-y-3 hover:shadow-[0_34px_60px_-20px_rgba(201,154,75,0.6)] hover:ring-gold/70"
                 }`}
               >
-                {/* Product Image Container — Exact /shop aspect-[2/3] Portrait Poster */}
+                {/* Product Image Container — Exact /shop aspect-[2/3] Portrait Poster linking to Product Details Page */}
                 <SmartImage
                   src={product.image_url || "/perfumes.png"}
                   alt={product.name}
@@ -342,6 +315,11 @@ export default function ComboOfferPage({ initialOffer }) {
                   imgClassName="pointer-events-none block h-full w-full object-contain transition duration-700 group-hover:brightness-105"
                 >
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+                  <Link
+                    href={productHref}
+                    aria-label={`View ${product.name} details`}
+                    className="absolute inset-0 z-[1]"
+                  />
 
                   {/* Top-left Selected Pill */}
                   {quantity > 0 && (
@@ -362,6 +340,14 @@ export default function ComboOfferPage({ initialOffer }) {
                       </span>
                     )
                   )}
+
+                  {/* Quick View Link to Full Product Details Page */}
+                  <Link
+                    href={productHref}
+                    className="absolute inset-x-3 bottom-3 z-10 flex translate-y-6 items-center justify-center gap-1.5 rounded-full bg-white/90 py-1.5 text-[10px] font-semibold text-ink opacity-0 shadow-lg backdrop-blur-xs transition duration-500 hover:bg-gold group-hover:translate-y-0 group-hover:opacity-100"
+                  >
+                    <Eye size={12} /> View Details
+                  </Link>
                 </SmartImage>
 
                 {/* Card Content — Exact /shop Product Listing Style */}
@@ -369,7 +355,9 @@ export default function ComboOfferPage({ initialOffer }) {
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <h2 className="line-clamp-2 break-words text-base font-bold leading-snug text-ink">
-                        {product.name}
+                        <Link href={productHref} className="transition hover:text-gold-dark">
+                          {product.name}
+                        </Link>
                       </h2>
                       {variantLabel && (
                         <span className="shrink-0 rounded-md border border-gold/30 bg-cream px-2 py-0.5 text-[10px] font-bold text-gold-dark">
@@ -395,10 +383,7 @@ export default function ComboOfferPage({ initialOffer }) {
                   </div>
 
                   {/* Interactive Action Control */}
-                  <div
-                    className="mt-3"
-                    onClick={(event) => event.stopPropagation()}
-                  >
+                  <div className="mt-3">
                     {soldOut ? (
                       <button
                         type="button"
@@ -454,207 +439,6 @@ export default function ComboOfferPage({ initialOffer }) {
           })}
         </div>
       </section>
-
-      {/* Product Detail Quick-View Modal — Zero-Scroll & Responsive (Mobile, Laptop & Desktop) */}
-      {activeModalProduct && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setActiveModalProduct(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-3 backdrop-blur-xs sm:p-4"
-        >
-          <div
-            onClick={(event) => event.stopPropagation()}
-            className="relative w-full max-w-[380px] overflow-hidden rounded-3xl border border-gold/30 bg-white p-4 shadow-2xl sm:max-w-[650px] sm:p-6 md:max-w-[700px]"
-          >
-            <button
-              type="button"
-              onClick={() => setActiveModalProduct(null)}
-              aria-label="Close modal"
-              className="absolute right-3.5 top-3.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/95 text-stone-600 transition hover:bg-stone-100 hover:text-ink sm:right-4 sm:top-4 sm:h-9 sm:w-9"
-            >
-              <X size={17} />
-            </button>
-
-            <div className="flex flex-col gap-3.5 sm:grid sm:grid-cols-[215px_1fr] sm:gap-6 md:grid-cols-[235px_1fr]">
-              {/* Top on Mobile (Side-by-Side Image + Title/Price/Notes) / Left Column on Laptop & Desktop */}
-              <div className="flex items-start gap-3.5 sm:block">
-                <div className="relative aspect-[2/3] w-[112px] shrink-0 overflow-hidden rounded-2xl bg-cream sm:w-full">
-                  <SmartImage
-                    src={modalUniqueImages[modalImageIdx] || activeModalProduct.image_url || "/perfumes.png"}
-                    alt={activeModalProduct.name}
-                    className="h-full w-full"
-                    imgClassName="h-full w-full object-contain"
-                  />
-                  {modalUniqueImages.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setModalImageIdx(
-                            (idx) => (idx - 1 + modalUniqueImages.length) % modalUniqueImages.length,
-                          )
-                        }
-                        className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 text-ink shadow-md hover:bg-white"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setModalImageIdx((idx) => (idx + 1) % modalUniqueImages.length)
-                        }
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 text-ink shadow-md hover:bg-white"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Mobile-only right header beside the thumbnail */}
-                <div className="min-w-0 flex-1 pr-7 sm:hidden">
-                  {activeModalProduct.variant_label &&
-                    activeModalProduct.variant_label.toLowerCase() !== "standard" && (
-                      <span className="mb-1 inline-block rounded-full border border-gold/30 bg-cream px-2.5 py-0.5 text-[10px] font-bold text-gold-dark">
-                        {activeModalProduct.variant_label}
-                      </span>
-                    )}
-                  <h2 className="line-clamp-2 font-serif text-xl font-bold leading-tight text-ink">
-                    {activeModalProduct.name}
-                  </h2>
-                  <PriceDisplay
-                    price={Number(activeModalProduct.price || activeModalProduct.unit_price || 0)}
-                    compareAtPrice={
-                      Number(activeModalProduct.compare_at_price) >
-                      Number(activeModalProduct.price || activeModalProduct.unit_price || 0)
-                        ? Number(activeModalProduct.compare_at_price)
-                        : null
-                    }
-                    showMrpAfterPrice
-                    className="mt-1"
-                    priceClassName="text-xl font-bold text-ink"
-                    mrpClassName="text-xs font-medium text-stone-400"
-                  />
-                  {modalNotes.length > 0 && (
-                    <div className="mt-2.5">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-stone-400">
-                        Fragrance Notes
-                      </p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {modalNotes.slice(0, 4).map((note) => (
-                          <span
-                            key={note}
-                            className="rounded-full border border-gold/25 bg-cream px-2 py-0.5 text-[10px] font-medium text-ink"
-                          >
-                            {note}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Details Column (Laptop/Desktop full details + Mobile description & actions) */}
-              <div className="flex min-w-0 flex-col justify-between">
-                <div>
-                  {/* Laptop/Desktop Title & Price */}
-                  <div className="hidden pr-8 sm:block">
-                    {activeModalProduct.variant_label &&
-                      activeModalProduct.variant_label.toLowerCase() !== "standard" && (
-                        <span className="mb-1.5 inline-block rounded-full border border-gold/30 bg-cream px-3 py-0.5 text-xs font-bold text-gold-dark">
-                          {activeModalProduct.variant_label}
-                        </span>
-                      )}
-                    <h2 className="font-serif text-2xl font-bold leading-tight text-ink">
-                      {activeModalProduct.name}
-                    </h2>
-
-                    <PriceDisplay
-                      price={Number(activeModalProduct.price || activeModalProduct.unit_price || 0)}
-                      compareAtPrice={
-                        Number(activeModalProduct.compare_at_price) >
-                        Number(activeModalProduct.price || activeModalProduct.unit_price || 0)
-                          ? Number(activeModalProduct.compare_at_price)
-                          : null
-                      }
-                      showMrpAfterPrice
-                      className="mt-1.5"
-                      priceClassName="text-2xl font-bold text-ink"
-                      mrpClassName="text-sm font-medium text-stone-400"
-                    />
-                  </div>
-
-                  <p className="line-clamp-3 text-xs leading-relaxed text-ink/75 sm:mt-3 sm:line-clamp-4 sm:text-[13.5px]">
-                    {activeModalProduct.description ||
-                      activeModalProduct.short_description ||
-                      "Crafted with long-lasting luxury fragrance oils for your custom gift set."}
-                  </p>
-
-                  {modalNotes.length > 0 && (
-                    <div className="mt-3.5 hidden sm:block">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                        Fragrance Notes
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {modalNotes.map((note) => (
-                          <span
-                            key={note}
-                            className="rounded-full border border-gold/25 bg-cream px-2.5 py-0.5 text-xs font-medium text-ink"
-                          >
-                            {note}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3.5 space-y-2.5 border-t border-stone-100 pt-3 sm:mt-5 sm:space-y-3 sm:pt-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-stone-500">Quantity in Set</span>
-                    <div className="flex items-center gap-3 rounded-xl border border-gold bg-cream p-1">
-                      <button
-                        type="button"
-                        onClick={() => changeQuantity(activeModalProduct, -1)}
-                        disabled={modalQuantity === 0}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-ink shadow-2xs disabled:opacity-35"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-6 text-center text-sm font-bold text-ink">
-                        {modalQuantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => changeQuantity(activeModalProduct, 1)}
-                        disabled={!canIncrementProduct(activeModalProduct)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-forest text-white shadow-2xs disabled:opacity-40"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (modalQuantity === 0 && canIncrementProduct(activeModalProduct)) {
-                        changeQuantity(activeModalProduct, 1);
-                      }
-                      setActiveModalProduct(null);
-                    }}
-                    className="w-full rounded-xl bg-forest py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-ink sm:py-3"
-                  >
-                    {modalQuantity === 0 ? "Add to Combo" : "Done"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Al Qirat Theme Sticky Bottom Visual Slot Dock */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gold/30 bg-white/95 shadow-[0_-14px_40px_-18px_rgba(20,40,26,0.3)] backdrop-blur-xl">

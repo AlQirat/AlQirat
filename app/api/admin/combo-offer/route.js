@@ -384,6 +384,8 @@ export async function PATCH(request) {
           ...(body.fragrance_notes ? { fragrance_notes: normalizeFragranceNotes(body.fragrance_notes) } : {}),
         }
       : {
+          image_url: imageUrl,
+          gallery_urls: galleryUrls,
           stock_quantity: stockQuantity,
           ...(compareAtPrice !== null ? { compare_at_price: compareAtPrice } : {}),
         };

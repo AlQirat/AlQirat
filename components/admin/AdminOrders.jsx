@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, ExternalLink, Mail, MapPin, Package, Phone, Save, SlidersHorizontal, Truck } from "lucide-react";
+import { Eye, ExternalLink, Mail, MapPin, Package, Phone, Save, SlidersHorizontal, Trash2, Truck } from "lucide-react";
 import CatalogDialog from "./CatalogDialog";
+import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
 
 const orderStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 const statusStyles = {
@@ -47,6 +48,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingShipment, setCreatingShipment] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState(null);
@@ -150,6 +152,56 @@ export default function AdminOrders() {
     await loadOrders(selected.id);
   }
 
+  async function deleteOrder(order) {
+    if (!order?.id) return;
+    const willRestoreStock =
+      order.status !== "delivered" &&
+      (order.payment_method === "cod" || order.payment_status === "paid");
+    const confirmMessage = [
+      `Delete Order ${order.order_number} (${order.customers?.full_name || "Guest customer"}) permanently?`,
+      willRestoreStock
+        ? "Product stock for this order will be automatically restored."
+        : "Order is already delivered or unpaid, so stock will not change.",
+      order.shiprocket_awb
+        ? `Note: Shiprocket AWB (${order.shiprocket_awb}) is assigned to this order.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setDeletingId(order.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to delete order.");
+
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      if (selected?.id === order.id) setSelected(null);
+
+      if (result.stock_restored) {
+        notifyStorefrontUpdate("catalog");
+        notifyStorefrontUpdate("combo");
+      }
+
+      const successText = result.stock_restored
+        ? `Order ${order.order_number} deleted and product stock restored.`
+        : `Order ${order.order_number} deleted.`;
+      setMessage(successText);
+      setToast({ type: "success", text: successText });
+    } catch (deleteError) {
+      setError(deleteError.message);
+      setToast({ type: "error", text: deleteError.message });
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
       {toast && <div role="status" aria-live="polite" className={`fixed right-4 top-4 z-[100] flex max-w-[min(92vw,420px)] items-start gap-3 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}><span className="flex-1">{toast.text}</span><button type="button" onClick={() => setToast(null)} aria-label="Dismiss notification" className="text-lg leading-none opacity-80 hover:opacity-100">×</button></div>}
@@ -177,7 +229,28 @@ export default function AdminOrders() {
               <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-600">Order {order.order_number}</p><p className="mt-2 text-lg font-bold text-slate-900">{order.customers?.full_name || "Guest customer"}</p><p className="mt-1 text-sm text-slate-500">{formatDate(order.created_at)}</p></div>
               <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Payment</p><p className="mt-2 font-semibold text-slate-900">{titleCase(order.payment_method || "Not specified")}</p></div>
               <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Order total</p><p className="mt-2 text-xl font-bold text-slate-900">{formatCurrency(order.total)}</p></div>
-              <div className="flex items-center gap-3 md:justify-end"><span className={`rounded-full px-3 py-2 text-xs font-bold uppercase ${statusStyles[order.status] || statusStyles.pending}`}>{titleCase(order.status)}</span><button type="button" onClick={() => openOrder(order)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"><Eye size={16} /> Manage</button></div>
+              <div className="flex items-center gap-2.5 md:justify-end">
+                <span className={`rounded-full px-3 py-2 text-xs font-bold uppercase ${statusStyles[order.status] || statusStyles.pending}`}>
+                  {titleCase(order.status)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => openOrder(order)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  <Eye size={16} /> Manage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteOrder(order)}
+                  disabled={deletingId === order.id}
+                  aria-label={`Delete order ${order.order_number}`}
+                  title="Delete order & restore stock"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
             <div className="border-t border-slate-100 px-5 py-4 sm:px-7"><div className="flex flex-wrap items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-700">{order.order_items?.length || 0} ordered product{order.order_items?.length === 1 ? "" : "s"}</span><span className="text-slate-500">{order.shiprocket_awb ? `AWB ${order.shiprocket_awb}` : "Shiprocket shipment not created"}</span></div></div>
           </article>)}
@@ -196,7 +269,21 @@ export default function AdminOrders() {
           <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white"><h3 className="border-b border-slate-200 px-5 py-4 text-lg font-bold text-slate-900">Ordered products</h3><div className="divide-y divide-slate-100">{(selected.order_items || []).map((item) => <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-4"><div className="flex min-w-0 items-center gap-4">{item.products?.image_url ? <img src={item.products.image_url} alt="" className="h-16 w-16 rounded-xl object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100"><Package className="text-slate-400" size={22} /></div>}<div><p className="font-semibold text-slate-900">{item.product_name}{item.variant_label ? ` (${item.variant_label})` : ""}</p><p className="mt-1 text-sm text-slate-500">Quantity {item.quantity} · {formatCurrency(item.unit_price)} each{item.combo_offer_id ? " · Combo offer" : ""}</p></div></div><p className="font-bold text-slate-900">{formatCurrency(item.line_total)}</p></div>)}</div><div className="space-y-2 border-t border-slate-100 bg-slate-50 px-5 py-4 text-sm"><p className="flex justify-between text-slate-600"><span>Items subtotal</span><span>{formatCurrency(Number(selected.subtotal) + Number(selected.discount_amount || 0))}</span></p>{Number(selected.discount_amount) > 0 && <p className="flex justify-between font-semibold text-emerald-700"><span>Combo savings</span><span>-{formatCurrency(selected.discount_amount)}</span></p>}<p className="flex justify-between text-slate-600"><span>Shipping</span><span>{Number(selected.shipping_amount) ? formatCurrency(selected.shipping_amount) : "Free"}</span></p><p className="flex justify-between text-base font-bold text-slate-900"><span>Order total</span><span>{formatCurrency(selected.total)}</span></p></div></article>
 
           <form onSubmit={saveOrderManagement} className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-            <div className="flex items-center gap-3"><SlidersHorizontal className="text-blue-600" size={22} /><h3 className="text-lg font-bold text-slate-900">Order management</h3></div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <SlidersHorizontal className="text-blue-600" size={22} />
+                <h3 className="text-lg font-bold text-slate-900">Order management</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => deleteOrder(selected)}
+                disabled={deletingId === selected.id}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                {deletingId === selected.id ? "Deleting..." : "Delete Order"}
+              </button>
+            </div>
             <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1.6fr]">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                 <h4 className="font-bold text-slate-900">Shipment details</h4>
