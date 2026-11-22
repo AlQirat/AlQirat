@@ -45,7 +45,7 @@ export default function HomeHero({ initialContent }) {
 
   function openComboOffer(event) {
     if (!comboSlide || event.target.closest("a, button")) return;
-    window.location.assign("/combo");
+    window.location.assign("/combos");
   }
 
   return (
@@ -55,7 +55,7 @@ export default function HomeHero({ initialContent }) {
       onKeyDown={(event) => {
         if (comboSlide && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
-          window.location.assign("/combo");
+          window.location.assign("/combos");
         }
       }}
       tabIndex={comboSlide ? 0 : undefined}
@@ -86,7 +86,7 @@ export default function HomeHero({ initialContent }) {
           />
         </div>
       ))}
-      {comboSlide && <a href="/combo" aria-label={slide.title || "View combo offer"} className="absolute inset-0 z-0" />}
+      {comboSlide && <a href="/combos" aria-label={slide.title || "View combo offer"} className="absolute inset-0 z-0" />}
       {/* keeps the copy readable whatever image the admin uploads */}
       {!comboSlide && <div className="absolute inset-0 -z-10 bg-gradient-to-r from-sage-light/70 via-sage-light/25 to-transparent md:from-sage-light/90 md:via-sage-light/60 md:via-40% md:to-transparent md:to-70%" />}
 
@@ -127,7 +127,7 @@ export default function HomeHero({ initialContent }) {
             </p>
           </div>
 
-          <a href={comboSlide ? "/combo" : slide.cta_href || "/shop"} className={`btn-forest relative z-20 ${comboSlide ? "mt-5" : "mt-8"} inline-flex animate-fade-up !px-7 [animation-delay:350ms]`}>
+          <a href={comboSlide ? "/combos" : slide.cta_href || "/shop"} className={`btn-forest relative z-20 ${comboSlide ? "mt-5" : "mt-8"} inline-flex animate-fade-up !px-7 [animation-delay:350ms]`}>
             {slide.cta_label || "Shop Now"}
           </a>
 

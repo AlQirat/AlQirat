@@ -39,6 +39,7 @@ const navigation = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "categories", label: "Categories", icon: FolderTree },
   { id: "products", label: "Products", icon: Package },
+  { id: "combo-offer", label: "Combo Set Builder", icon: Gift },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "customers", label: "Customers", icon: Users },
   { id: "reviews", label: "Reviews", icon: Star },
@@ -46,7 +47,6 @@ const navigation = [
   { id: "subscribers", label: "Subscribers", icon: Mail },
   { id: "custom-perfume", label: "Custom Perfume Requests", icon: Star },
   { id: "hero-slides", label: "Hero Slides", icon: ImageIcon },
-  { id: "combo-offer", label: "Combo Offer", icon: Gift },
   { id: "announcements", label: "Announcements", icon: BellRing },
   { id: "delivery", label: "Delivery Settings", icon: Truck },
   { id: "faqs", label: "Global FAQs", icon: CircleHelp },
@@ -244,7 +244,7 @@ export default function AdminPanel({ initialSection }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f7f6] text-ink lg:grid lg:h-screen lg:grid-cols-[220px_1fr] lg:overflow-hidden">
+    <div className="min-h-screen bg-[#f7f7f6] text-ink lg:fixed lg:inset-0 lg:grid lg:h-screen lg:grid-cols-[220px_1fr] lg:overflow-hidden">
       <div className="hidden h-screen lg:block">{sidebar}</div>
 
       {mobileMenuOpen && (

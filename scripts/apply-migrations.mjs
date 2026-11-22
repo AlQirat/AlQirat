@@ -31,6 +31,10 @@ const defaultMigrations = [
   "20261029_combo_offer_any_quantity.sql",
   "20261112_custom_perfume_guest_requests.sql",
   "20261112_product_fragrance_notes.sql",
+  "20261122_combos_builder.sql",
+  "20261122_combo_generated_banners.sql",
+  "20261122_sync_catalog_combo_prices.sql",
+  "20261122_uniform_default_combo_price.sql",
 ];
 
 function loadEnv() {

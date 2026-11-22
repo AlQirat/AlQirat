@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, Minus, Plus, ShoppingBag, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Minus,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import SmartImage from "./SmartImage";
+import PriceDisplay from "./PriceDisplay";
 import { useCart } from "./CartProvider";
 import { useStorefrontComboOffer } from "./useStorefrontData";
 import { calculateComboPricing } from "@/lib/comboPricing";
@@ -12,106 +22,776 @@ function currency(value) {
   return `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
+function getNotesList(notes) {
+  if (!notes || typeof notes !== "object") return [];
+  const all = [
+    ...(Array.isArray(notes.top) ? notes.top : []),
+    ...(Array.isArray(notes.heart) ? notes.heart : []),
+    ...(Array.isArray(notes.base) ? notes.base : []),
+  ]
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  return [...new Set(all)].slice(0, 6);
+}
+
 export default function ComboOfferPage({ initialOffer }) {
   const router = useRouter();
   const { addComboItem } = useCart();
   const { data, error } = useStorefrontComboOffer({ offer: initialOffer });
   const offer = data.offer;
+
   const [quantities, setQuantities] = useState({});
-  const [message, setMessage] = useState("");
+  const [targetSets, setTargetSets] = useState(1);
+  const [activeModalProduct, setActiveModalProduct] = useState(null);
+  const [modalImageIdx, setModalImageIdx] = useState(0);
+  const [toast, setToast] = useState("");
+  const [confettiPieces, setConfettiPieces] = useState([]);
+  const prevTotalRef = useRef(0);
+  const gridRef = useRef(null);
 
   useEffect(() => {
-    setQuantities((current) => Object.fromEntries(
-      Object.entries(current).filter(([productId]) => offer?.products?.some((product) => String(product.product_id || product.id) === productId)),
-    ));
+    setQuantities((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([productId]) =>
+          offer?.products?.some((product) => String(product.product_id || product.id) === productId),
+        ),
+      ),
+    );
   }, [offer]);
 
+  const bundleQuantity = Math.max(2, Number(offer?.bundle_quantity) || 4);
+  const maxQuantity = Math.max(bundleQuantity, Number(offer?.max_quantity) || bundleQuantity * 10);
+  const maxPerProduct = Math.max(1, Number(offer?.max_quantity_per_product) || maxQuantity);
+  const maxAllowedSets = Math.max(1, Math.floor(maxQuantity / bundleQuantity));
+
   const selections = useMemo(
-    () => (offer?.products || []).map((product) => ({
-      ...product,
-      product_id: product.product_id || product.id,
-      quantity: quantities[String(product.product_id || product.id)] || 0,
-    })).filter((product) => product.quantity > 0),
+    () =>
+      (offer?.products || [])
+        .map((product) => ({
+          ...product,
+          product_id: String(product.product_id || product.id),
+          quantity: quantities[String(product.product_id || product.id)] || 0,
+        }))
+        .filter((product) => product.quantity > 0),
     [offer, quantities],
   );
+
   const pricing = useMemo(() => calculateComboPricing(offer || {}, selections), [offer, selections]);
-  const minQuantity = Math.max(1, Number(offer?.min_quantity) || 1);
-  const maxQuantity = Math.max(minQuantity, Number(offer?.max_quantity) || minQuantity);
-  const maxPerProduct = Number(offer?.max_quantity_per_product || maxQuantity || 1);
+  const totalSelected = pricing.totalQuantity;
+
+  const minimumSetsForSelection = Math.max(1, Math.ceil(totalSelected / bundleQuantity));
+  const currentSetGoal = Math.min(maxAllowedSets, Math.max(targetSets, minimumSetsForSelection));
+  const currentTargetBottles = Math.min(maxQuantity, currentSetGoal * bundleQuantity);
+  const remainingToGoal = Math.max(0, currentTargetBottles - totalSelected);
+  const completedSets = Math.floor(totalSelected / bundleQuantity);
+  const isCurrentGoalComplete = totalSelected > 0 && totalSelected === currentTargetBottles;
+  const isReadyForCheckout = totalSelected >= bundleQuantity && totalSelected % bundleQuantity === 0;
+  const progressPercent = Math.min(100, Math.round((totalSelected / currentTargetBottles) * 100));
+
+  useEffect(() => {
+    if (totalSelected < prevTotalRef.current) {
+      const shrunkSets = Math.max(1, Math.ceil(totalSelected / bundleQuantity));
+      if (shrunkSets < targetSets) setTargetSets(shrunkSets);
+    }
+    if (
+      totalSelected > prevTotalRef.current &&
+      totalSelected >= bundleQuantity &&
+      totalSelected % bundleQuantity === 0
+    ) {
+      const setsUnlocked = totalSelected / bundleQuantity;
+      const saved = pricing.discount;
+      setToast(
+        saved > 0
+          ? `${setsUnlocked > 1 ? `${setsUnlocked} Combo Sets` : "Combo Discount"} unlocked! You saved ${currency(saved)}`
+          : `Your ${setsUnlocked > 1 ? `${setsUnlocked} combo sets are` : "combo gift set is"} complete`,
+      );
+      prevTotalRef.current = totalSelected;
+    }
+    prevTotalRef.current = totalSelected;
+    return undefined;
+  }, [totalSelected, bundleQuantity, pricing.discount, targetSets]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const id = setTimeout(() => setToast(""), 3800);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!activeModalProduct) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setActiveModalProduct(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeModalProduct]);
+
+  function canIncrementProduct(product) {
+    if (!offer) return false;
+    const productId = String(product.product_id || product.id);
+    const currentQuantity = quantities[productId] || 0;
+    const stock = Number(product.stock_quantity);
+    if (stock <= 0 || currentQuantity >= stock) return false;
+    if (currentQuantity >= maxPerProduct) return false;
+    if (totalSelected >= maxQuantity) return false;
+    if (!offer.allow_same_product && currentQuantity >= 1) return false;
+    if (!offer.allow_mixed_products && totalSelected > 0 && currentQuantity === 0) return false;
+    return true;
+  }
 
   function changeQuantity(product, delta) {
+    if (!offer) return;
     const productId = String(product.product_id || product.id);
     const currentQuantity = quantities[productId] || 0;
     const nextQuantity = currentQuantity + delta;
-    if (nextQuantity < 0 || nextQuantity > maxPerProduct) return;
-    if (delta > 0 && pricing.totalQuantity >= maxQuantity) return;
-    if (delta > 0 && product.stock_quantity > 0 && nextQuantity > product.stock_quantity) return;
-    if (delta > 0 && !offer.allow_same_product && nextQuantity > 1) return;
-    if (delta > 0 && !offer.allow_mixed_products && pricing.totalQuantity > 0 && currentQuantity === 0) return;
-    setMessage("");
-    setQuantities((current) => ({ ...current, [productId]: nextQuantity }));
+    if (nextQuantity < 0) return;
+    if (delta > 0 && !canIncrementProduct(product)) return;
+
+    const nextTotal = totalSelected + delta;
+    if (delta > 0 && nextTotal > currentTargetBottles && nextTotal <= maxQuantity) {
+      setTargetSets(Math.ceil(nextTotal / bundleQuantity));
+    }
+
+    setQuantities((current) => {
+      const updated = { ...current, [productId]: nextQuantity };
+      if (nextQuantity <= 0) delete updated[productId];
+      return updated;
+    });
   }
 
-  function addToCart() {
-    if (pricing.totalQuantity < minQuantity) {
-      setMessage(`Select at least ${minQuantity} perfumes to continue.`);
+  function handleCheckout() {
+    if (!isReadyForCheckout) {
+      setToast(`Please add ${remainingToGoal} more bottle${remainingToGoal === 1 ? "" : "s"} to complete your set.`);
       return;
     }
-    addComboItem(offer, selections);
-    router.push("/cart");
+    addComboItem(offer, selections, { replace: true });
+    setToast(`${totalSelected} bottles added to your bag. Redirecting to checkout...`);
+    router.push("/checkout");
+  }
+
+  function openProductModal(product) {
+    setActiveModalProduct(product);
+    setModalImageIdx(0);
   }
 
   if (error) {
-    return <main className="min-h-[60vh] bg-cream px-4 py-20"><div className="mx-auto max-w-xl rounded-3xl border border-red-100 bg-white p-10 text-center"><h1 className="font-serif text-3xl">Combo offer unavailable</h1><p className="mt-3 text-stone-500">{error}</p></div></main>;
+    return (
+      <main className="min-h-[60vh] bg-cream px-4 py-20">
+        <div className="mx-auto max-w-xl rounded-3xl border border-red-100 bg-white p-10 text-center">
+          <h1 className="font-serif text-3xl text-ink">Combo Set Unavailable</h1>
+          <p className="mt-3 text-stone-500">{error}</p>
+        </div>
+      </main>
+    );
   }
 
   if (!offer) {
-    return <main className="min-h-[60vh] bg-cream px-4 py-20"><div className="mx-auto max-w-xl rounded-3xl border border-gold/20 bg-white p-10 text-center shadow-sm"><Sparkles className="mx-auto text-gold-dark" size={34} /><h1 className="mt-4 font-serif text-3xl">This combo is taking a pause</h1><p className="mt-3 text-stone-500">Please check back soon for our next fragrance offer.</p><a href="/shop" className="btn-gold mt-7 inline-flex">Continue Shopping</a></div></main>;
+    return (
+      <main className="min-h-[60vh] bg-cream px-4 py-20">
+        <div className="mx-auto max-w-xl rounded-3xl border border-gold/20 bg-white p-10 text-center shadow-sm">
+          <Sparkles className="mx-auto text-gold-dark" size={34} />
+          <h1 className="mt-4 font-serif text-3xl text-ink">Our Combo Sets Are Taking a Pause</h1>
+          <p className="mt-3 text-stone-500">Please check back soon for our next custom gift & combo offer.</p>
+          <a href="/shop" className="btn-gold mt-7 inline-flex">
+            Continue Shopping
+          </a>
+        </div>
+      </main>
+    );
   }
 
+  const modalImages = activeModalProduct
+    ? [
+        activeModalProduct.image_url,
+        ...(Array.isArray(activeModalProduct.gallery_urls) ? activeModalProduct.gallery_urls : []),
+      ].filter(Boolean)
+    : [];
+  const modalUniqueImages = [...new Set(modalImages)];
+  const modalProductId = activeModalProduct ? String(activeModalProduct.product_id || activeModalProduct.id) : "";
+  const modalQuantity = modalProductId ? quantities[modalProductId] || 0 : 0;
+  const modalNotes = activeModalProduct ? getNotesList(activeModalProduct.fragrance_notes) : [];
+
   return (
-    <main className="overflow-x-clip bg-cream pb-36">
-      <section className="relative isolate hidden overflow-hidden border-b border-gold/20 bg-ink sm:block">
-        <SmartImage src={offer.banner_image_url} alt={offer.title} className="absolute inset-0" imgClassName="h-full w-full object-cover" tone="from-ink to-sage" />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/70 via-ink/35 to-transparent" />
-        <div className="container-site relative z-10 py-20 sm:py-28">
-          <p className="text-xs font-semibold uppercase tracking-[0.34em] text-gold-light">Build your own box</p>
-          <h1 className="mt-4 max-w-3xl font-serif text-4xl font-semibold leading-tight text-white sm:text-6xl">{offer.title}</h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">{offer.description || offer.subtitle}</p>
-          <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold text-white/90">
-            <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">{offer.bundle_quantity} perfumes · {currency(offer.combo_price)}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">{currency(offer.default_unit_price)} individual price by default</span>
+    <main className="min-h-screen overflow-x-clip bg-cream pb-56 text-ink">
+      {/* Confetti Celebration Overlay */}
+      {confettiPieces.length > 0 && (
+        <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden="true">
+          {confettiPieces.map((piece) => (
+            <span
+              key={piece.id}
+              style={{
+                left: piece.left,
+                backgroundColor: piece.color,
+                animationDelay: piece.delay,
+              }}
+              className="absolute top-1/3 h-3 w-2.5 animate-bounce rounded-xs opacity-90 shadow-xs"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div
+          role="status"
+          className="fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full border border-gold/40 bg-ink/95 px-5 py-2.5 text-xs font-bold text-gold-light shadow-2xl backdrop-blur-md sm:text-sm"
+        >
+          {toast}
+        </div>
+      )}
+
+      {/* Al Qirat Theme Hero Section with Option A Background Banner (Desktop + Mobile) */}
+      <section className="relative isolate overflow-hidden border-b border-gold/25 bg-cream-dark">
+        <div className="absolute inset-0 -z-20">
+          <SmartImage
+            src={offer.banner_image_url || "/combo-banner-desktop.jpg"}
+            alt={offer.title}
+            tone="from-sage to-cream"
+            imageKitTransform="f-auto,q-80,w-1920"
+            loading="eager"
+            fetchPriority="high"
+            className="absolute inset-0 hidden md:block"
+            imgClassName="h-full w-full object-cover object-[78%_center]"
+          />
+          <SmartImage
+            src={offer.mobile_banner_image_url || "/combo-banner-mobile.jpg"}
+            alt={offer.title}
+            tone="from-sage to-cream"
+            imageKitTransform="f-auto,q-80,w-1080"
+            loading="eager"
+            fetchPriority="high"
+            className="absolute inset-0 md:hidden"
+            imgClassName="h-full w-full object-cover object-bottom"
+          />
+        </div>
+        {/* Readability gradient overlay: keeps text on the left (desktop) and top (mobile) crisp while showcasing bottles on the right/bottom */}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-cream/85 via-cream/45 to-transparent md:bg-gradient-to-r md:from-cream/85 md:via-cream/45 md:via-45% md:to-transparent md:to-70%" />
+
+        <div className="container-site relative z-10 flex min-h-[460px] flex-col justify-center py-12 sm:py-16 md:min-h-[480px] lg:min-h-[520px]">
+          <div className="max-w-[580px]">
+            <h1 className="animate-fade-up font-serif text-[clamp(34px,3.25vw,54px)] font-semibold leading-[1.08] text-ink drop-shadow-[0_2px_10px_rgba(246,244,236,0.85)]">
+              {offer.title}
+            </h1>
+
+            <div className="mt-4 animate-fade-up [animation-delay:150ms]">
+              <span aria-hidden="true" className="flex items-center gap-2">
+                <span className="h-px w-24 bg-gold/70" />
+                <span className="h-1.5 w-1.5 rotate-45 bg-gold" />
+                <span className="h-px w-24 bg-gold/70" />
+              </span>
+              <p className="mt-3.5 text-[11.5px] font-medium uppercase tracking-[0.3em] text-ink/80">
+                Build Your Own Luxury Set · Any {bundleQuantity} For {currency(offer.combo_price)}
+              </p>
+            </div>
+
+            <p className="mt-4 max-w-[440px] animate-fade-up text-[15.5px] leading-relaxed text-ink/75 drop-shadow-[0_1px_8px_rgba(246,244,236,0.9)] [animation-delay:250ms]">
+              {offer.subtitle ||
+                offer.description ||
+                `Pick any ${bundleQuantity} perfumes for just ${currency(offer.combo_price)}`}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => gridRef.current?.scrollIntoView({ behavior: "smooth" })}
+              className="btn-forest relative z-20 mt-6 inline-flex animate-fade-up !px-7 [animation-delay:350ms]"
+            >
+              Start Building Your Set
+            </button>
           </div>
         </div>
       </section>
 
-      <section className="container-site py-8 sm:py-16">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div><p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-gold-dark sm:text-xs">Choose your fragrances</p><h2 className="mt-2 font-serif text-2xl font-semibold text-ink sm:text-4xl">Pick any combination</h2><p className="mt-2 hidden max-w-2xl text-sm text-stone-500 sm:block">Same or mixed perfumes are supported. Each card shows its admin-configured individual price.</p></div>
-          <div className="rounded-2xl border border-gold/30 bg-white px-3 py-2 text-right shadow-sm sm:px-5 sm:py-3"><p className="text-[10px] uppercase tracking-[0.18em] text-stone-500 sm:text-xs">Selected</p><p className="mt-1 text-xl font-bold text-ink sm:text-2xl">{pricing.totalQuantity}<span className="text-xs font-medium text-stone-500 sm:text-sm"> / {maxQuantity}</span></p></div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-2 items-start gap-3 sm:mt-9 sm:gap-5 xl:grid-cols-4">
-          {offer.products.map((product) => {
+      {/* Product Grid Section */}
+      <section ref={gridRef} className="container-site py-8 sm:py-12">
+        <div className="grid grid-cols-2 gap-3.5 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
+          {(offer.products || []).map((product) => {
             const productId = String(product.product_id || product.id);
             const quantity = quantities[productId] || 0;
             const soldOut = Number(product.stock_quantity) <= 0;
+            const canAddMore = canIncrementProduct(product);
+            const reachedSetGoal = totalSelected >= currentTargetBottles && totalSelected >= maxQuantity;
+            const displayPrice = Number(product.price || product.unit_price || 0);
+            const displayMrp = Number(product.compare_at_price) > displayPrice ? Number(product.compare_at_price) : null;
+            const variantLabel =
+              product.variant_label && product.variant_label.toLowerCase() !== "standard"
+                ? product.variant_label
+                : "";
+
             return (
-              <article key={productId} className={`group min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm transition sm:rounded-3xl ${quantity ? "border-gold ring-2 ring-gold/20" : "border-stone-200 hover:-translate-y-1 hover:border-gold/60"}`}>
-                <div className="relative aspect-square bg-cream"><SmartImage src={product.image_url || "/perfumes.png"} alt={product.name} className="h-full w-full" imgClassName="h-full w-full object-contain transition duration-700 group-hover:brightness-105" />{quantity > 0 && <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white"><Check size={13} /> {quantity} selected</span>}</div>
-                <div className="p-3 sm:p-5"><h3 className="min-h-10 break-words text-sm font-semibold leading-5 text-ink sm:min-h-12 sm:text-base sm:leading-6">{product.name}</h3><div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="text-lg font-bold text-ink sm:text-xl">{currency(product.unit_price)}</span>{Number(product.price) > Number(product.unit_price) && <span className="text-[10px] text-stone-400 line-through sm:text-sm">{currency(product.price)}</span>}</div><p className="mt-1 text-[10px] text-stone-500 sm:text-xs">{product.stock_quantity > 0 ? `${product.stock_quantity} available` : "Currently unavailable"}</p><div className="mt-3 flex items-center justify-between rounded-xl border border-stone-200 bg-cream/50 p-1 sm:mt-4 sm:p-1.5"><button type="button" onClick={() => changeQuantity(product, -1)} disabled={quantity === 0} aria-label={`Remove one ${product.name}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-ink transition hover:bg-white disabled:opacity-30 sm:h-9 sm:w-9"><Minus size={14} /></button><span className="text-sm font-bold text-ink">{quantity}</span><button type="button" onClick={() => changeQuantity(product, 1)} disabled={soldOut || pricing.totalQuantity >= maxQuantity || quantity >= maxPerProduct} aria-label={`Add one ${product.name}`} className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold text-ink transition hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9"><Plus size={14} /></button></div></div>
+              <article
+                key={productId}
+                onClick={() => openProductModal(product)}
+                className={`group relative flex h-full min-w-0 cursor-pointer select-none flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] transition duration-500 ${
+                  quantity > 0
+                    ? "ring-2 ring-gold shadow-[0_20px_45px_-18px_rgba(201,154,75,0.55)]"
+                    : reachedSetGoal || soldOut
+                      ? "ring-1 ring-stone-200 opacity-60"
+                      : "ring-1 ring-stone-200 hover:-translate-y-3 hover:shadow-[0_34px_60px_-20px_rgba(201,154,75,0.6)] hover:ring-gold/70"
+                }`}
+              >
+                {/* Product Image Container — Exact /shop aspect-[2/3] Portrait Poster */}
+                <SmartImage
+                  src={product.image_url || "/perfumes.png"}
+                  alt={product.name}
+                  className="relative aspect-[2/3] w-full shrink-0"
+                  imgClassName="pointer-events-none block h-full w-full object-contain transition duration-700 group-hover:brightness-105"
+                >
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+
+                  {/* Top-left Selected Pill */}
+                  {quantity > 0 && (
+                    <span className="pointer-events-none absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white shadow-lg">
+                      <Check size={13} className="text-gold-light" /> {quantity} selected
+                    </span>
+                  )}
+
+                  {/* Top-right Sold Out or Badge */}
+                  {soldOut ? (
+                    <span className="pointer-events-none absolute right-2.5 top-2.5 z-10 rounded-full bg-ink/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg">
+                      Sold Out
+                    </span>
+                  ) : (
+                    product.badge && (
+                      <span className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 px-2 py-0.5 text-[9px] font-bold text-white shadow-lg">
+                        {product.badge === "New Arrival" || product.badge === "New" ? "NEW" : product.badge}
+                      </span>
+                    )
+                  )}
+                </SmartImage>
+
+                {/* Card Content — Exact /shop Product Listing Style */}
+                <div className="flex flex-1 flex-col justify-between p-3.5 sm:p-4">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="line-clamp-2 break-words text-base font-bold leading-snug text-ink">
+                        {product.name}
+                      </h2>
+                      {variantLabel && (
+                        <span className="shrink-0 rounded-md border border-gold/30 bg-cream px-2 py-0.5 text-[10px] font-bold text-gold-dark">
+                          {variantLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    {(product.short_description || product.description) && (
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">
+                        {product.short_description || product.description}
+                      </p>
+                    )}
+
+                    <PriceDisplay
+                      price={displayPrice}
+                      compareAtPrice={displayMrp}
+                      showMrpAfterPrice
+                      className="mt-2"
+                      priceClassName="text-xl font-bold text-ink"
+                      mrpClassName="text-xs font-medium text-stone-400"
+                    />
+                  </div>
+
+                  {/* Interactive Action Control */}
+                  <div
+                    className="mt-3"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {soldOut ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full cursor-not-allowed rounded-xl bg-stone-100 py-2.5 text-xs font-bold uppercase tracking-wider text-stone-400"
+                      >
+                        Sold Out
+                      </button>
+                    ) : quantity === 0 ? (
+                      !canAddMore ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full cursor-not-allowed rounded-xl border border-stone-200 bg-stone-100 py-2.5 text-xs font-bold text-stone-400"
+                        >
+                          Set Full
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => changeQuantity(product, 1)}
+                          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-ink py-2.5 text-xs font-semibold text-white transition hover:bg-forest sm:text-sm"
+                        >
+                          <Plus size={15} /> Add to Combo
+                        </button>
+                      )
+                    ) : (
+                      <div className="flex items-center justify-between rounded-xl border border-gold bg-cream p-1">
+                        <button
+                          type="button"
+                          onClick={() => changeQuantity(product, -1)}
+                          aria-label={`Remove one ${product.name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-ink shadow-2xs transition hover:bg-stone-100 sm:h-9 sm:w-9"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className="text-sm font-bold text-ink">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => changeQuantity(product, 1)}
+                          disabled={!canAddMore}
+                          aria-label={`Add one ${product.name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-white shadow-2xs transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </article>
             );
           })}
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gold/20 bg-white/95 shadow-[0_-18px_40px_-28px_rgba(20,40,26,0.7)] backdrop-blur">
-        <div className="container-site flex items-center gap-3 py-2.5 sm:py-4">
-          <div className="min-w-0"><p className="text-sm font-semibold text-ink">{pricing.totalQuantity} selected</p><p className="mt-1 truncate text-xs text-stone-500">{pricing.lines.length ? pricing.lines.map((line) => `${line.name} × ${line.quantity}`).join(" · ") : "Choose one or more perfumes"}</p></div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-5"><div className="text-right"><p className="hidden text-xs text-stone-500 sm:block">Combo total</p><p className="text-lg font-bold text-ink sm:text-2xl">{currency(pricing.total)}</p>{pricing.discount > 0 && <p className="hidden text-xs font-semibold text-emerald-700 sm:block">You save {currency(pricing.discount)}</p>}</div><button type="button" onClick={addToCart} disabled={pricing.totalQuantity < minQuantity} className="btn-gold inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-[11px] disabled:cursor-not-allowed disabled:opacity-45 sm:h-auto sm:gap-2 sm:px-5 sm:py-3 sm:text-sm"><ShoppingBag size={15} /> <span className="max-w-[86px] truncate sm:max-w-none">{offer.cta_label || "Add Combo"}</span></button></div>
+      {/* Product Detail Quick-View Modal — Zero-Scroll & Responsive (Mobile, Laptop & Desktop) */}
+      {activeModalProduct && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setActiveModalProduct(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-3 backdrop-blur-xs sm:p-4"
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="relative w-full max-w-[380px] overflow-hidden rounded-3xl border border-gold/30 bg-white p-4 shadow-2xl sm:max-w-[650px] sm:p-6 md:max-w-[700px]"
+          >
+            <button
+              type="button"
+              onClick={() => setActiveModalProduct(null)}
+              aria-label="Close modal"
+              className="absolute right-3.5 top-3.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/95 text-stone-600 transition hover:bg-stone-100 hover:text-ink sm:right-4 sm:top-4 sm:h-9 sm:w-9"
+            >
+              <X size={17} />
+            </button>
+
+            <div className="flex flex-col gap-3.5 sm:grid sm:grid-cols-[215px_1fr] sm:gap-6 md:grid-cols-[235px_1fr]">
+              {/* Top on Mobile (Side-by-Side Image + Title/Price/Notes) / Left Column on Laptop & Desktop */}
+              <div className="flex items-start gap-3.5 sm:block">
+                <div className="relative aspect-[2/3] w-[112px] shrink-0 overflow-hidden rounded-2xl bg-cream sm:w-full">
+                  <SmartImage
+                    src={modalUniqueImages[modalImageIdx] || activeModalProduct.image_url || "/perfumes.png"}
+                    alt={activeModalProduct.name}
+                    className="h-full w-full"
+                    imgClassName="h-full w-full object-contain"
+                  />
+                  {modalUniqueImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setModalImageIdx(
+                            (idx) => (idx - 1 + modalUniqueImages.length) % modalUniqueImages.length,
+                          )
+                        }
+                        className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 text-ink shadow-md hover:bg-white"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setModalImageIdx((idx) => (idx + 1) % modalUniqueImages.length)
+                        }
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 text-ink shadow-md hover:bg-white"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Mobile-only right header beside the thumbnail */}
+                <div className="min-w-0 flex-1 pr-7 sm:hidden">
+                  {activeModalProduct.variant_label &&
+                    activeModalProduct.variant_label.toLowerCase() !== "standard" && (
+                      <span className="mb-1 inline-block rounded-full border border-gold/30 bg-cream px-2.5 py-0.5 text-[10px] font-bold text-gold-dark">
+                        {activeModalProduct.variant_label}
+                      </span>
+                    )}
+                  <h2 className="line-clamp-2 font-serif text-xl font-bold leading-tight text-ink">
+                    {activeModalProduct.name}
+                  </h2>
+                  <PriceDisplay
+                    price={Number(activeModalProduct.price || activeModalProduct.unit_price || 0)}
+                    compareAtPrice={
+                      Number(activeModalProduct.compare_at_price) >
+                      Number(activeModalProduct.price || activeModalProduct.unit_price || 0)
+                        ? Number(activeModalProduct.compare_at_price)
+                        : null
+                    }
+                    showMrpAfterPrice
+                    className="mt-1"
+                    priceClassName="text-xl font-bold text-ink"
+                    mrpClassName="text-xs font-medium text-stone-400"
+                  />
+                  {modalNotes.length > 0 && (
+                    <div className="mt-2.5">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-stone-400">
+                        Fragrance Notes
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {modalNotes.slice(0, 4).map((note) => (
+                          <span
+                            key={note}
+                            className="rounded-full border border-gold/25 bg-cream px-2 py-0.5 text-[10px] font-medium text-ink"
+                          >
+                            {note}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Details Column (Laptop/Desktop full details + Mobile description & actions) */}
+              <div className="flex min-w-0 flex-col justify-between">
+                <div>
+                  {/* Laptop/Desktop Title & Price */}
+                  <div className="hidden pr-8 sm:block">
+                    {activeModalProduct.variant_label &&
+                      activeModalProduct.variant_label.toLowerCase() !== "standard" && (
+                        <span className="mb-1.5 inline-block rounded-full border border-gold/30 bg-cream px-3 py-0.5 text-xs font-bold text-gold-dark">
+                          {activeModalProduct.variant_label}
+                        </span>
+                      )}
+                    <h2 className="font-serif text-2xl font-bold leading-tight text-ink">
+                      {activeModalProduct.name}
+                    </h2>
+
+                    <PriceDisplay
+                      price={Number(activeModalProduct.price || activeModalProduct.unit_price || 0)}
+                      compareAtPrice={
+                        Number(activeModalProduct.compare_at_price) >
+                        Number(activeModalProduct.price || activeModalProduct.unit_price || 0)
+                          ? Number(activeModalProduct.compare_at_price)
+                          : null
+                      }
+                      showMrpAfterPrice
+                      className="mt-1.5"
+                      priceClassName="text-2xl font-bold text-ink"
+                      mrpClassName="text-sm font-medium text-stone-400"
+                    />
+                  </div>
+
+                  <p className="line-clamp-3 text-xs leading-relaxed text-ink/75 sm:mt-3 sm:line-clamp-4 sm:text-[13.5px]">
+                    {activeModalProduct.description ||
+                      activeModalProduct.short_description ||
+                      "Crafted with long-lasting luxury fragrance oils for your custom gift set."}
+                  </p>
+
+                  {modalNotes.length > 0 && (
+                    <div className="mt-3.5 hidden sm:block">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                        Fragrance Notes
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {modalNotes.map((note) => (
+                          <span
+                            key={note}
+                            className="rounded-full border border-gold/25 bg-cream px-2.5 py-0.5 text-xs font-medium text-ink"
+                          >
+                            {note}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3.5 space-y-2.5 border-t border-stone-100 pt-3 sm:mt-5 sm:space-y-3 sm:pt-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-stone-500">Quantity in Set</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-gold bg-cream p-1">
+                      <button
+                        type="button"
+                        onClick={() => changeQuantity(activeModalProduct, -1)}
+                        disabled={modalQuantity === 0}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-ink shadow-2xs disabled:opacity-35"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-6 text-center text-sm font-bold text-ink">
+                        {modalQuantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => changeQuantity(activeModalProduct, 1)}
+                        disabled={!canIncrementProduct(activeModalProduct)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-forest text-white shadow-2xs disabled:opacity-40"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (modalQuantity === 0 && canIncrementProduct(activeModalProduct)) {
+                        changeQuantity(activeModalProduct, 1);
+                      }
+                      setActiveModalProduct(null);
+                    }}
+                    className="w-full rounded-xl bg-forest py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-ink sm:py-3"
+                  >
+                    {modalQuantity === 0 ? "Add to Combo" : "Done"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        {message && <p role="alert" className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-xs font-semibold text-red-700">{message}</p>}
+      )}
+
+      {/* Al Qirat Theme Sticky Bottom Visual Slot Dock */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gold/30 bg-white/95 shadow-[0_-14px_40px_-18px_rgba(20,40,26,0.3)] backdrop-blur-xl">
+        <div className="container-site py-3.5 sm:py-4">
+          {/* Status Text & Progress Counter Row */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-ink sm:text-sm">
+              {remainingToGoal > 0 ? (
+                <>
+                  Add{" "}
+                  <span className="font-bold text-gold-dark">{remainingToGoal}</span>{" "}
+                  more bottle{remainingToGoal === 1 ? "" : "s"} to unlock{" "}
+                  {currentSetGoal > 1 ? `Set #${currentSetGoal} ` : ""}special price of{" "}
+                  <span className="font-bold text-ink">
+                    {currency(currentSetGoal * Number(offer.combo_price || 0))}
+                  </span>
+                </>
+              ) : (
+                <span className="font-bold text-forest">
+                  {completedSets} Combo Set{completedSets > 1 ? "s" : ""} Unlocked — Special price of{" "}
+                  {currency(pricing.total)} applied
+                </span>
+              )}
+            </p>
+
+            <div className="flex items-center gap-3">
+              {isCurrentGoalComplete && currentSetGoal < maxAllowedSets && (
+                <button
+                  type="button"
+                  onClick={() => setTargetSets((s) => Math.min(maxAllowedSets, s + 1))}
+                  className="rounded-full border border-gold/40 bg-cream px-3 py-1 text-[11px] font-bold text-ink transition hover:border-forest hover:bg-forest hover:text-white"
+                >
+                  + Add Set #{currentSetGoal + 1} (+{bundleQuantity} slots)
+                </button>
+              )}
+              <span className="text-xs font-bold tabular-nums text-ink sm:text-sm">
+                {totalSelected} <span className="text-gold-dark">/ {currentTargetBottles}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Animated Progress Bar */}
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-cream-dark">
+            <div
+              style={{ width: `${progressPercent}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${
+                isReadyForCheckout
+                  ? "bg-gradient-to-r from-forest to-ink"
+                  : "bg-gradient-to-r from-gold-dark via-gold to-gold-light"
+              }`}
+            />
+          </div>
+
+          {/* Bottom Row: Visual Slot Boxes (+) & Checkout CTA */}
+          <div className="mt-3.5 flex items-center justify-between gap-3">
+            {/* Scrollable Slot Thumbnails + Empty '+' Boxes */}
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto py-1">
+              {selections.map((item) => (
+                <div
+                  key={item.product_id}
+                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 border-gold bg-cream shadow-2xs sm:h-16 sm:w-16"
+                  title={`${item.name} × ${item.quantity}`}
+                >
+                  <SmartImage
+                    src={item.image_url || "/perfumes.png"}
+                    alt={item.name}
+                    className="h-full w-full"
+                    imgClassName="h-full w-full object-cover"
+                  />
+                  {item.quantity > 1 && (
+                    <span className="absolute bottom-1 right-1 rounded-md bg-ink/90 px-1.5 py-0.5 text-[10px] font-bold text-gold-light">
+                      ×{item.quantity}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => changeQuantity(item, -1)}
+                    aria-label={`Remove one ${item.name}`}
+                    className="absolute inset-0 flex items-center justify-center bg-ink/60 text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+
+              {/* Empty Dashed '+' Slot Boxes for Remaining Bottles */}
+              {Array.from({ length: Math.min(10, remainingToGoal) }).map((_, index) => (
+                <button
+                  key={`empty-slot-${index}`}
+                  type="button"
+                  onClick={() => gridRef.current?.scrollIntoView({ behavior: "smooth" })}
+                  aria-label={`Empty bottle slot ${index + 1}`}
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-gold/45 bg-cream/70 text-gold-dark transition hover:border-gold hover:bg-cream sm:h-16 sm:w-16"
+                >
+                  <Plus size={18} />
+                </button>
+              ))}
+            </div>
+
+            {/* Right Price Summary + Checkout Button */}
+            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+              {isReadyForCheckout && (
+                <div className="text-right">
+                  <div className="flex items-baseline justify-end gap-1.5">
+                    <span className="text-base font-bold text-ink sm:text-xl">
+                      {currency(pricing.total)}
+                    </span>
+                    {pricing.discount > 0 && (
+                      <span className="hidden text-xs text-stone-400 line-through sm:inline">
+                        {currency(pricing.regularSubtotal)}
+                      </span>
+                    )}
+                  </div>
+                  {pricing.discount > 0 && (
+                    <p className="text-[11px] font-bold text-forest">
+                      Saved {currency(pricing.discount)}!
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleCheckout}
+                disabled={!isReadyForCheckout}
+                className={`inline-flex h-12 items-center gap-2 rounded-full px-6 text-xs font-bold tracking-wide text-white shadow-md transition sm:h-13 sm:px-8 sm:text-sm ${
+                  isReadyForCheckout
+                    ? "bg-forest hover:bg-ink"
+                    : "cursor-not-allowed bg-forest/45 opacity-80"
+                }`}
+              >
+                <CreditCard size={16} />
+                <span>Checkout</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );

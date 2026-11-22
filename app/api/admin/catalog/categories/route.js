@@ -11,7 +11,7 @@ export async function GET(request) {
   const [{ data: categories, error }, { data: subcategories, error: subcategoryError }, { data: products, error: productError }] = await Promise.all([
     supabase.from("categories").select("id,name,slug,description,image_url,sort_order,is_active").order("sort_order"),
     supabase.from("subcategories").select("id,category_id,name,slug,sort_order,is_active").order("sort_order"),
-    supabase.from("products").select("id,category_id"),
+    supabase.from("products").select("id,category_id").neq("show_in_shop", false),
   ]);
 
   const queryError = error || subcategoryError || productError;

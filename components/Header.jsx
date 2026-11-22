@@ -14,8 +14,8 @@ import { useStorefrontCategories, useStorefrontContent } from "./useStorefrontDa
 import { brand } from "@/lib/brand";
 
 // The Shop menu lists the categories managed in the admin dashboard.
-function buildNavItems(categories) {
-  return [
+function buildNavItems(categories, comboOffer) {
+  const items = [
     { label: "Home", href: "/" },
     {
       label: "Shop",
@@ -28,13 +28,24 @@ function buildNavItems(categories) {
           }))
         : undefined,
     },
+  ];
+  if (comboOffer?.is_active) {
+    items.push({
+      label: "Combos",
+      href: "/combos",
+      isCombo: true,
+      badge: "Offer",
+    });
+  }
+  items.push(
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
-  ];
+  );
+  return items;
 }
 
 // Hover / keyboard-focus dropdown listing every category with its picture.
-function ShopMenu({ item, active }) {
+function ShopMenu({ item, active, comboOffer }) {
   return (
     <div className="group relative">
       <a
@@ -72,6 +83,26 @@ function ShopMenu({ item, active }) {
               </li>
             ))}
           </ul>
+          {comboOffer?.is_active && (
+            <div className="border-t border-stone-100 p-2.5">
+              <a
+                href="/combos"
+                className="block rounded-xl border border-gold/30 bg-gradient-to-r from-cream to-sage-light p-3 transition hover:border-gold"
+              >
+                <span className="inline-block rounded-full bg-forest px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold-light">
+                  {comboOffer.showcase_badge || "Combo Set"}
+                </span>
+                <p className="mt-1.5 text-[13.5px] font-bold text-ink">
+                  {comboOffer.showcase_heading || comboOffer.title || "Build Your Own Combo"}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-[11.5px] text-ink/70">
+                  {comboOffer.showcase_description ||
+                    comboOffer.subtitle ||
+                    `Pick any ${comboOffer.bundle_quantity || 3} bottles for ₹${comboOffer.combo_price || 499}`}
+                </p>
+              </a>
+            </div>
+          )}
           <a href={item.href} className="flex items-center justify-center border-t border-stone-100 bg-cream/60 py-3 text-[13px] font-medium text-ink transition hover:text-gold-dark">
             View all products
           </a>
@@ -108,7 +139,8 @@ export default function Header({ initialCatalog, initialContent }) {
   const { count: wishlistCount } = useWishlist();
   const { data: storefrontContent } = useStorefrontContent(initialContent);
   const { categories: liveCategories } = useStorefrontCategories(initialCatalog);
-  const navItems = buildNavItems(liveCategories);
+  const comboOffer = storefrontContent.combo_offer;
+  const navItems = buildNavItems(liveCategories, comboOffer);
   const announcements = (storefrontContent.announcements || []).map((item) => item.message).filter(Boolean);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -128,6 +160,7 @@ export default function Header({ initialCatalog, initialContent }) {
   const isActive = (href) => {
     if (href === "/") return pathname === "/";
     if (href === "/shop") return pathname.startsWith("/shop") || pathname.startsWith("/products") || pathname === "/all-products";
+    if (href === "/combos") return pathname === "/combos" || pathname === "/combo";
     return pathname === href;
   };
 
@@ -148,17 +181,17 @@ export default function Header({ initialCatalog, initialContent }) {
 
             <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
               {navItems.map((item) => item.children ? (
-                <ShopMenu key={item.label} item={item} active={isActive(item.href)} />
+                <ShopMenu key={item.label} item={item} active={isActive(item.href)} comboOffer={comboOffer} />
               ) : (
                 <a
                   key={item.label}
                   href={item.href}
                   aria-current={isActive(item.href) ? "page" : undefined}
-                  className={`relative py-2 text-[13.5px] font-medium tracking-wide transition duration-300 hover:text-gold-dark ${
+                  className={`relative flex items-center gap-1.5 py-2 text-[13.5px] font-medium tracking-wide transition duration-300 hover:text-gold-dark ${
                     isActive(item.href) ? "text-ink" : "text-ink/75"
                   }`}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
                   <span
                     className={`absolute inset-x-0 -bottom-0.5 h-[2px] rounded-full bg-ink transition-transform duration-300 ${
                       isActive(item.href) ? "scale-x-100" : "scale-x-0"

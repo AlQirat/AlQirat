@@ -136,11 +136,17 @@ export function CartProvider({ children }) {
     setItems(nextItems);
   }, []);
 
-  const addComboItem = useCallback((offer, selections) => {
+  const addComboItem = useCallback((offer, selections, options = {}) => {
     const currentItems = itemsRef.current;
     const existing = currentItems.find((item) => item.kind === "combo" && item.offerId === offer.id);
-    const mergedSelections = existing ? mergeComboSelections(existing.selections, selections) : selections;
-    const nextCombo = normalizeComboCartItem(offer, mergedSelections);
+    const maxQty = Math.max(1, Number(offer?.max_quantity) || 40);
+    let finalSelections = selections;
+    if (existing && !options.replace) {
+      const merged = mergeComboSelections(existing.selections, selections);
+      const mergedTotal = merged.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+      finalSelections = mergedTotal <= maxQty ? merged : selections;
+    }
+    const nextCombo = normalizeComboCartItem(offer, finalSelections);
     const nextItems = existing
       ? currentItems.map((item) => item.slug === existing.slug ? nextCombo : item)
       : [...currentItems, nextCombo];
