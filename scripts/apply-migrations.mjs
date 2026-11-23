@@ -37,6 +37,7 @@ const defaultMigrations = [
   "20261122_uniform_default_combo_price.sql",
   "20261124_product_collections.sql",
   "20261124_gift_set_hero_slide.sql",
+  "20261124_attar_collection.sql",
 ];
 
 function loadEnv() {

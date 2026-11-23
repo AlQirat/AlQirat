@@ -40,6 +40,7 @@ function buildNavItems(categories, comboOffer) {
   items.push(
     { label: "Special Edition", href: "/special-editions" },
     { label: "Gift Sets", href: "/gift-sets" },
+    { label: "Attars", href: "/attars" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
   );

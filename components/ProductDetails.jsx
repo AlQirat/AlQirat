@@ -46,6 +46,7 @@ function getDescription(product) {
   const categoryDescriptions = {
     Perfumes: "A refined extrait de parfum selected for its expressive character and lasting presence.",
     Attars: "A traditional concentrated perfume oil, made to be worn close to the skin.",
+    Attar: "A traditional concentrated perfume oil, made to be worn close to the skin.",
     "Gift Sets": "A considered gift set from Al Qirat, presented for someone special.",
     "Special Editions": "An exclusive Al Qirat edition for true connoisseurs.",
     "Combo Collection": "Crafted with long-lasting luxury fragrance oils for your custom Al Qirat combo set.",

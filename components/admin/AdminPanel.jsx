@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleHelp,
   ClipboardList,
+  Droplets,
   FolderTree,
   Gift,
   Image as ImageIcon,
@@ -45,6 +46,7 @@ const navigation = [
   { id: "combo-offer", label: "Combo Set Builder", icon: Gift },
   { id: "special-edition", label: "Special Edition", icon: Sparkles },
   { id: "gift-set", label: "Gift Set", icon: PackageOpen },
+  { id: "attar", label: "Attar", icon: Droplets },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "customers", label: "Customers", icon: Users },
   { id: "reviews", label: "Reviews", icon: Star },
@@ -200,7 +202,7 @@ function renderModule(active) {
   if (active === "custom-perfume") return <AdminCustomPerfume />;
   if (active === "hero-slides") return <AdminContentManager resource="hero-slides" />;
   if (active === "combo-offer") return <AdminComboOffer />;
-  if (active === "special-edition" || active === "gift-set") return <AdminCollection key={active} collection={active} />;
+  if (active === "special-edition" || active === "gift-set" || active === "attar") return <AdminCollection key={active} collection={active} />;
   if (active === "announcements") return <AdminContentManager resource="announcements" />;
   if (active === "delivery") return <AdminDeliverySettings />;
   return <AdminContentManager resource="faqs" />;

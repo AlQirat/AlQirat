@@ -25,6 +25,7 @@ const adminSections = new Set([
   "combo-offer",
   "special-edition",
   "gift-set",
+  "attar",
   "announcements",
   "delivery",
   "faqs",
