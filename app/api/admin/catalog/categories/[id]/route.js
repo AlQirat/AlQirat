@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminCatalogClient, createSlug, isAuthorizedAdminRequest } from "@/lib/adminCatalog";
+import { parseRedirectLink } from "@/lib/categoryLink";
 
 export async function PATCH(request, { params }) {
   if (!isAuthorizedAdminRequest(request)) return NextResponse.json({ error: "Administrator authentication is required." }, { status: 401 });
@@ -7,12 +8,16 @@ export async function PATCH(request, { params }) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Category name is required." }, { status: 400 });
 
+  const redirect = parseRedirectLink(body.redirect_url);
+  if (redirect.error) return NextResponse.json({ error: redirect.error }, { status: 400 });
+
   const supabase = createAdminCatalogClient();
   const { data, error } = await supabase.from("categories").update({
     name,
     slug: createSlug(name),
     description: typeof body.description === "string" ? body.description.trim() || null : null,
     image_url: typeof body.image_url === "string" ? body.image_url.trim() || null : null,
+    redirect_url: redirect.value,
     is_active: body.is_active !== false,
   }).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

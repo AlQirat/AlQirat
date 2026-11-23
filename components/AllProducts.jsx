@@ -18,11 +18,15 @@ function categorySlug(value) {
 
 function buildCategoryOptions(catalogCategories = [], products = []) {
   const byKey = new Map();
+  const productCategoryKeys = new Set(products.map((product) => String(product?.category || "").trim().toLowerCase()));
 
   catalogCategories.forEach((category) => {
     const name = String(category?.name || "").trim();
     if (!name) return;
     const key = name.toLowerCase();
+    // A category that only redirects to another page (Attars, Gift Sets...) and holds no shop products
+    // would show up as an empty "0" filter, so leave it out.
+    if (category?.redirect_url && !productCategoryKeys.has(key)) return;
     if (!byKey.has(key)) {
       byKey.set(key, {
         name,

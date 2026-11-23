@@ -12,6 +12,7 @@ import { useCart } from "./CartProvider";
 import { useWishlist } from "./WishlistProvider";
 import { useStorefrontCategories, useStorefrontContent } from "./useStorefrontData";
 import { brand } from "@/lib/brand";
+import { getCategoryHref } from "@/lib/categoryLink";
 
 // The Shop menu lists the categories managed in the admin dashboard.
 function buildNavItems(categories, comboOffer) {
@@ -23,7 +24,7 @@ function buildNavItems(categories, comboOffer) {
       children: categories.length
         ? categories.map((category) => ({
             name: category.name,
-            href: `/shop?category=${category.slug}`,
+            href: getCategoryHref(category),
             image: category.image_url || "",
           }))
         : undefined,

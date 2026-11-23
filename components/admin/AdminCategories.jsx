@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, FolderTree, Pencil, Plus, Save, Trash2, Upload } from "lucide-react";
+import { Eye, FolderTree, Link2, Pencil, Plus, Save, Trash2, Upload } from "lucide-react";
 import { uploadImage } from "@/lib/uploadImage";
 import SmartImage from "@/components/SmartImage";
 import CatalogDialog from "./CatalogDialog";
@@ -34,6 +34,7 @@ function CategoryForm({ category, onSaved, onCancel }) {
       name: form.get("name"),
       description: form.get("description"),
       image_url: form.get("image_url"),
+      redirect_url: form.get("redirect_url"),
       is_active: form.get("is_active") === "on",
     };
     const url = category ? `/api/admin/catalog/categories/${category.id}` : "/api/admin/catalog/categories";
@@ -86,6 +87,10 @@ function CategoryForm({ category, onSaved, onCancel }) {
         {uploading && <p className="mt-1 text-sm text-gold-dark">Uploading...</p>}
       </div>
       <label className="text-sm font-semibold sm:col-span-2">Description<textarea name="description" defaultValue={category?.description || ""} rows={3} className="mt-2 w-full rounded-xl border border-stone-200 p-3 text-sm outline-none focus:border-gold focus:ring-4 focus:ring-gold/10" /></label>
+      <label className="text-sm font-semibold sm:col-span-2">Redirect link <span className="font-normal text-stone-400">(optional)</span>
+        <input name="redirect_url" defaultValue={category?.redirect_url || ""} maxLength={500} className={inputClass} placeholder="/gift-sets or https://example.com" />
+        <span className="mt-1.5 block text-xs font-normal text-stone-500">Leave empty to open this category&apos;s products in the Shop. If you add a link, clicking this category in the menu and on the homepage goes there instead.</span>
+      </label>
       <label className="flex items-center gap-3 text-sm font-semibold sm:col-span-2"><input name="is_active" type="checkbox" defaultChecked={category?.is_active ?? true} className="h-4 w-4 accent-[#C99A4B]" /> Active on storefront</label>
       {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2">{error}</p>}
       <div className="flex justify-end gap-3 sm:col-span-2"><button type="button" onClick={onCancel} className="rounded-xl border px-5 py-3 text-sm font-semibold">Cancel</button><button disabled={saving} className="flex items-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Save size={16} />{saving ? "Saving..." : "Save Category"}</button></div>
@@ -200,6 +205,7 @@ export default function AdminCategories() {
                     </span>
                   </div>
                   <p className="mt-1 line-clamp-1 text-sm text-stone-500">{category.description || "No category description has been added."}</p>
+                  {category.redirect_url && <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-semibold text-gold-dark"><Link2 size={12} className="shrink-0" /> Redirects to {category.redirect_url}</p>}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 sm:justify-end">
                   <div className="text-xs text-stone-500 sm:text-right">

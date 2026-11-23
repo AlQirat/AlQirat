@@ -38,6 +38,8 @@ const defaultMigrations = [
   "20261124_product_collections.sql",
   "20261124_gift_set_hero_slide.sql",
   "20261124_attar_collection.sql",
+  "20261124_category_redirect_url.sql",
+  "20261124_collection_categories.sql",
 ];
 
 function loadEnv() {
