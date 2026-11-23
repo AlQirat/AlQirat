@@ -16,9 +16,11 @@ import {
   Menu,
   MessageSquare,
   Package,
+  PackageOpen,
   Plus,
   Search,
   ShoppingBag,
+  Sparkles,
   Star,
   Truck,
   UserRound,
@@ -33,6 +35,7 @@ import AdminInquiries from "@/components/admin/AdminInquiries";
 import AdminSubscribers from "@/components/admin/AdminSubscribers";
 import AdminCustomPerfume from "@/components/admin/AdminCustomPerfume";
 import AdminComboOffer from "@/components/admin/AdminComboOffer";
+import AdminCollection from "@/components/admin/AdminCollection";
 import { AdminContentManager, AdminDeliverySettings, AdminReviews } from "@/components/admin/AdminContent";
 
 const navigation = [
@@ -40,12 +43,14 @@ const navigation = [
   { id: "categories", label: "Categories", icon: FolderTree },
   { id: "products", label: "Products", icon: Package },
   { id: "combo-offer", label: "Combo Set Builder", icon: Gift },
+  { id: "special-edition", label: "Special Edition", icon: Sparkles },
+  { id: "gift-set", label: "Gift Set", icon: PackageOpen },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "customers", label: "Customers", icon: Users },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "inquiries", label: "Inquiries", icon: MessageSquare },
   { id: "subscribers", label: "Subscribers", icon: Mail },
-  { id: "custom-perfume", label: "Custom Perfume Requests", icon: Star },
+  { id: "custom-perfume", label: "Custom Perfumes", icon: Star },
   { id: "hero-slides", label: "Hero Slides", icon: ImageIcon },
   { id: "announcements", label: "Announcements", icon: BellRing },
   { id: "delivery", label: "Delivery Settings", icon: Truck },
@@ -195,6 +200,7 @@ function renderModule(active) {
   if (active === "custom-perfume") return <AdminCustomPerfume />;
   if (active === "hero-slides") return <AdminContentManager resource="hero-slides" />;
   if (active === "combo-offer") return <AdminComboOffer />;
+  if (active === "special-edition" || active === "gift-set") return <AdminCollection key={active} collection={active} />;
   if (active === "announcements") return <AdminContentManager resource="announcements" />;
   if (active === "delivery") return <AdminDeliverySettings />;
   return <AdminContentManager resource="faqs" />;

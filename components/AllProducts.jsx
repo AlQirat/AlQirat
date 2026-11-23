@@ -10,6 +10,7 @@ import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import { useWishlist } from "./WishlistProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
+import { COLLECTIONS } from "@/lib/collections";
 
 function categorySlug(value) {
   return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -78,7 +79,7 @@ function getInitialFilterState(categoryOptions, initialCategory, queryString = "
 
 const INITIAL_VISIBLE_CATEGORIES = 5;
 
-function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalogPrice, selectedCategories, maximumPrice, onCategoryToggle, onClearCategories, onMaximumPriceChange, onReset }) {
+function FilterPanel({ products, categories, showCategories = true, minimumCatalogPrice, maximumCatalogPrice, selectedCategories, maximumPrice, onCategoryToggle, onClearCategories, onMaximumPriceChange, onReset }) {
   const hasActiveFilters = selectedCategories.size > 0 || maximumPrice < maximumCatalogPrice;
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [priceOpen, setPriceOpen] = useState(true);
@@ -114,7 +115,7 @@ function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalog
         )}
       </div>
 
-      <div className="px-5 py-4">
+      {showCategories && <div className="px-5 py-4">
         <button
           type="button"
           onClick={() => setCategoriesOpen((open) => !open)}
@@ -178,9 +179,9 @@ function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalog
             )}
           </div>
         )}
-      </div>
+      </div>}
 
-      <div className="border-t border-stone-200 px-5 py-4">
+      <div className={`${showCategories ? "border-t border-stone-200 " : ""}px-5 py-4`}>
         <button
           type="button"
           onClick={() => setPriceOpen((open) => !open)}
@@ -232,10 +233,13 @@ function Stars({ value }) {
   );
 }
 
-export default function AllProducts({ initialCategory, initialCatalog }) {
+// `collection` ("special-edition" | "gift-set") shows that collection's own categories and products
+// instead of the regular shop catalog.
+export default function AllProducts({ initialCategory, initialCatalog, collection = null }) {
+  const collectionInfo = collection ? COLLECTIONS[collection] : null;
   const { addItem } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  const { products, categories: catalogCategories = [], error: catalogError } = useStorefrontCatalog(initialCatalog);
+  const { products, categories: catalogCategories = [], error: catalogError } = useStorefrontCatalog(initialCatalog, collection);
   const categoryOptions = useMemo(
     () => buildCategoryOptions(catalogCategories, products),
     [catalogCategories, products],
@@ -371,7 +375,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
       <div className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[420px] animate-glow rounded-full bg-[radial-gradient(circle,rgba(232,189,109,0.28),transparent_65%)]" />
       <div className="pointer-events-none absolute -right-40 bottom-10 h-[460px] w-[460px] animate-glow rounded-full bg-[radial-gradient(circle,rgba(201,154,75,0.22),transparent_65%)] [animation-delay:2s]" />
       <span className="pointer-events-none absolute -top-6 right-6 hidden select-none font-serif text-[200px] font-bold leading-none text-gold/[0.06] lg:block">
-        Products
+        {collectionInfo?.plural || "Products"}
       </span>
 
       {/* Floating ornamental seal */}
@@ -393,13 +397,13 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
           <div>
             <p className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.35em] text-gold-dark">
               <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-dark" />
-              Complete Collection
+              {collectionInfo?.eyebrow || "Complete Collection"}
             </p>
             <h2 className="mt-3 font-serif text-4xl font-semibold text-ink lg:text-5xl">
-              All <span className="text-shimmer-dark">Products</span>
+              {collectionInfo ? <span className="text-shimmer-dark">{collectionInfo.plural}</span> : <>All <span className="text-shimmer-dark">Products</span></>}
             </h2>
             <p className="mt-3 hidden max-w-[420px] text-base text-stone-500 sm:block">
-              {products.length} premium perfumes, attars and gift sets.
+              {collectionInfo ? `${products.length} ${products.length === 1 ? collectionInfo.label.toLowerCase() : collectionInfo.plural.toLowerCase()}. ${collectionInfo.description}` : `${products.length} premium perfumes, attars and gift sets.`}
             </p>
           </div>
         </Reveal>
@@ -459,6 +463,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
             <FilterPanel
               products={products}
               categories={categories}
+              showCategories={!collectionInfo}
               minimumCatalogPrice={minimumCatalogPrice}
               maximumCatalogPrice={maximumCatalogPrice}
               selectedCategories={selectedCategories}
@@ -481,7 +486,7 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
             const isAdded = added.has(p.name);
             const liked = isWishlisted(p);
             return (
-              <Reveal key={p.name} delay={i * 40} className="h-full">
+              <Reveal key={p.slug || p.name} delay={i * 40} className="h-full">
                 <article className="group relative flex h-full min-w-0 select-none flex-col overflow-hidden rounded-3xl bg-white shadow-[0_10px_30px_-18px_rgba(21,16,12,0.35)] ring-1 ring-stone-200 transition duration-500 hover:-translate-y-3 hover:shadow-[0_34px_60px_-20px_rgba(201,154,75,0.6)] hover:ring-gold/70">
                   <SmartImage
                     src={p.src}
@@ -601,8 +606,8 @@ export default function AllProducts({ initialCategory, initialCatalog }) {
 
         {filteredProducts.length === 0 && (
           <div className="rounded-3xl border border-gold/20 bg-white py-16 text-center shadow-sm">
-            <p className="font-serif text-2xl font-semibold text-ink">No products match these filters</p>
-            <p className="mt-2 text-sm text-stone-500">Try another category or increase the maximum price.</p>
+            <p className="font-serif text-2xl font-semibold text-ink">{collectionInfo && products.length === 0 ? `${collectionInfo.plural} are coming soon` : "No products match these filters"}</p>
+            <p className="mt-2 text-sm text-stone-500">{collectionInfo && products.length === 0 ? "New arrivals will appear here shortly." : "Try another category or increase the maximum price."}</p>
             <button type="button" onClick={resetFilters} className="mt-5 rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-gold-dark">
               Clear Filters
             </button>

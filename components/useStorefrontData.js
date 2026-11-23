@@ -86,8 +86,9 @@ function useLiveEndpoint(url, initialValue) {
   };
 }
 
-export function useStorefrontCatalog(initialCatalog = emptyCatalog) {
-  const { data, error, refresh } = useLiveEndpoint("/api/storefront/catalog", initialCatalog);
+export function useStorefrontCatalog(initialCatalog = emptyCatalog, collection = null) {
+  const url = collection ? `/api/storefront/catalog?collection=${encodeURIComponent(collection)}` : "/api/storefront/catalog";
+  const { data, error, refresh } = useLiveEndpoint(url, initialCatalog);
   const products = useMemo(() => {
     const seen = new Set();
     return data.products

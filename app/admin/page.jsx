@@ -23,6 +23,8 @@ const adminSections = new Set([
   "custom-perfume",
   "hero-slides",
   "combo-offer",
+  "special-edition",
+  "gift-set",
   "announcements",
   "delivery",
   "faqs",

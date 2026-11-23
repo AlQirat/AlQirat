@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminCatalogClient, createSlug, isAuthorizedAdminRequest } from "@/lib/adminCatalog";
+import { createAdminCatalogClient, createSlug, isAuthorizedAdminRequest, resolveProductSlug } from "@/lib/adminCatalog";
 import { normalizeFragranceNotes } from "@/lib/fragranceNotes";
+import { parseCollection } from "@/lib/collections";
 
 function normalizeVariants(value) {
   if (value === undefined) return [];
@@ -33,7 +34,10 @@ function buildPayload(body) {
   const price = Number(body.price);
   const compareAtPrice = body.compare_at_price === undefined || body.compare_at_price === null || body.compare_at_price === "" ? null : Number(body.compare_at_price);
   const stockQuantity = Number(body.stock_quantity);
-  if (!name || !body.category_id || !body.image_url) throw new Error("Name, category, and product image are required.");
+  const collection = parseCollection(body.collection);
+  if (collection === undefined) throw new Error("Unknown collection.");
+  // Special Edition / Gift Set products have no category; shop products need one.
+  if (!name || (!collection && !body.category_id) || !body.image_url) throw new Error(collection ? "Name and product image are required." : "Name, category, and product image are required.");
   const slug = createSlug(name);
   if (!slug) throw new Error("Product name must include English letters or numbers.");
   if (!Number.isFinite(price) || price < 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) throw new Error("Price or stock quantity is invalid.");
@@ -41,8 +45,9 @@ function buildPayload(body) {
   return {
     name,
     slug,
-    category_id: body.category_id,
-    subcategory_id: body.subcategory_id || null,
+    collection,
+    category_id: collection ? null : body.category_id,
+    subcategory_id: collection ? null : body.subcategory_id || null,
     short_description: String(body.short_description || "").trim() || name,
     description: String(body.description || "").trim() || null,
     price,
@@ -62,7 +67,9 @@ export async function PATCH(request, { params }) {
   if (!isAuthorizedAdminRequest(request)) return NextResponse.json({ error: "Administrator authentication is required." }, { status: 401 });
   try {
     const supabase = createAdminCatalogClient();
-    const { data, error } = await supabase.from("products").update(buildPayload(await request.json())).eq("id", params.id).select().single();
+    const payload = buildPayload(await request.json());
+    payload.slug = await resolveProductSlug(supabase, { name: payload.name, categoryId: payload.category_id, excludeId: params.id, collection: payload.collection });
+    const { data, error } = await supabase.from("products").update(payload).eq("id", params.id).select().single();
     if (error) return NextResponse.json({ error: formatProductDbError(error) }, { status: 400 });
     return NextResponse.json({ product: data });
   } catch (error) {

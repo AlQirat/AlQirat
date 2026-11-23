@@ -54,6 +54,7 @@ async function readOffer() {
     supabase
       .from("products")
       .select("id,name,slug,short_description,description,price,compare_at_price,stock_quantity,image_url,gallery_urls,fragrance_notes,badge,variant_label,show_in_shop,is_active,created_at")
+      .is("collection", null)
       .order("created_at"),
     supabase
       .from("combo_offer_products")

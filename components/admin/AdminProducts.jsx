@@ -7,7 +7,6 @@ import SmartImage from "@/components/SmartImage";
 import CatalogDialog from "./CatalogDialog";
 import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
 import { fragranceNotesToText, normalizeFragranceNotes, parseFragranceNoteText } from "@/lib/fragranceNotes";
-
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-gold focus:ring-4 focus:ring-gold/10";
 
 function normalizeVariants(variants) {
@@ -27,7 +26,9 @@ const fragranceNoteGroups = [
   { key: "base", label: "Base Notes", placeholder: "Vanilla, musk, sandalwood" },
 ];
 
-function ProductForm({ product, categories, onSaved, onCancel }) {
+// `collection` ("special-edition" | "gift-set") is set when the form is used by AdminCollection: those products
+// have no category or subcategory. Without it the form edits a regular shop product.
+export function ProductForm({ product, categories, collection = null, onSaved, onCancel }) {
   const [categoryId, setCategoryId] = useState(product?.category_id || categories[0]?.id || "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,11 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
     const form = new FormData(event.currentTarget);
     if (!imageUrls.length) {
       setError("Add at least one product image.");
+      setSaving(false);
+      return;
+    }
+    if (!collection && !categoryId) {
+      setError("Select a category.");
       setSaving(false);
       return;
     }
@@ -99,7 +105,7 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
       return;
     }
     const payload = {
-      name: form.get("name"), category_id: categoryId, subcategory_id: form.get("subcategory_id") || null,
+      name: form.get("name"), collection: collection || null, category_id: collection ? null : categoryId, subcategory_id: collection ? null : form.get("subcategory_id") || null,
       short_description: form.get("short_description"), description: form.get("description"),
       price: normalizedVariants[0]?.price ?? form.get("price"), compare_at_price: normalizedVariants[0]?.compare_at_price ?? form.get("compare_at_price"), stock_quantity: form.get("stock_quantity"), image_url: imageUrls[0], gallery_urls: imageUrls.slice(1), variants: normalizedVariants,
       fragrance_notes: normalizedFragranceNotes,
@@ -162,9 +168,11 @@ function ProductForm({ product, categories, onSaved, onCancel }) {
         <p className="mt-2 text-xs leading-relaxed text-stone-500">First image is primary. Recommended: <span className="font-semibold text-stone-700">1:1 · 1000 × 1000 px · JPG, PNG, or WebP</span></p>
         {uploading && <p className="mt-1 text-sm text-gold-dark">Uploading images...</p>}
       </div>
-      <label className="text-sm font-semibold">Category<select name="category_id" required value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className={inputClass}>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="text-sm font-semibold">Subcategory<select name="subcategory_id" defaultValue={product?.subcategory_id || ""} className={inputClass}><option value="">No subcategory</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="text-sm font-semibold">Selling price (₹)<input name="price" type="number" min="0" step="0.01" required defaultValue={product?.price || ""} className={inputClass} /></label>
+      {!collection && <>
+        <label className="text-sm font-semibold">Category<select name="category_id" required value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className={inputClass}>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="text-sm font-semibold">Subcategory<select name="subcategory_id" defaultValue={product?.subcategory_id || ""} className={inputClass}><option value="">No subcategory</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      </>}
+      <label className="text-sm font-semibold">{collection ? "Rate (₹)" : "Selling price (₹)"}<input name="price" type="number" min="0" step="0.01" required defaultValue={product?.price || ""} className={inputClass} /></label>
       <label className="text-sm font-semibold">MRP (₹)<input name="compare_at_price" type="number" min="0" step="0.01" defaultValue={product?.compare_at_price ?? ""} className={inputClass} placeholder="Optional" /></label>
       <label className="text-sm font-semibold">Stock quantity<input name="stock_quantity" type="number" min="0" step="1" required defaultValue={product?.stock_quantity ?? 0} className={inputClass} /></label>
       <div className="rounded-2xl border border-gold/25 bg-cream/50 p-4 sm:col-span-2">

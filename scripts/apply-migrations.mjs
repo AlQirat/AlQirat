@@ -35,6 +35,8 @@ const defaultMigrations = [
   "20261122_combo_generated_banners.sql",
   "20261122_sync_catalog_combo_prices.sql",
   "20261122_uniform_default_combo_price.sql",
+  "20261124_product_collections.sql",
+  "20261124_gift_set_hero_slide.sql",
 ];
 
 function loadEnv() {

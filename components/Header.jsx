@@ -38,6 +38,8 @@ function buildNavItems(categories, comboOffer) {
     });
   }
   items.push(
+    { label: "Special Edition", href: "/special-editions" },
+    { label: "Gift Sets", href: "/gift-sets" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
   );
@@ -179,7 +181,7 @@ export default function Header({ initialCatalog, initialContent }) {
               <Logo className="h-14 sm:h-[76px]" />
             </a>
 
-            <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
+            <nav aria-label="Main" className="hidden items-center gap-6 xl:gap-9 lg:flex">
               {navItems.map((item) => item.children ? (
                 <ShopMenu key={item.label} item={item} active={isActive(item.href)} comboOffer={comboOffer} />
               ) : (
